@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Pose Grid Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { position: absolute; }
+    video { display: none; }
+  </style>
+</head>
+<body>
+  <video class="input_video"></video>
+  <canvas class="output_canvas"></canvas>
+
+  <script src="app.js"></script>
+</body>
+</html>
