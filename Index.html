@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Pose Grid Tracker</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="https://docs.opencv.org/4.x/opencv.js"></script>
+
+  <style>
+    body { margin: 0; overflow: hidden; background: black; }
+    canvas { position: absolute; }
+    video { display: none; }
+
+    .controls {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      padding: 10px;
+      border-radius: 8px;
+      font-family: sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <video class="input_video"></video>
+  <canvas class="output_canvas"></canvas>
+
+  <div class="controls">
+    Grid Size:
+    <input type="number" id="gridSize" value="12" min="2" max="30"><br>
+    Confidence:
+    <input type="range" id="confidence" min="0" max="1" step="0.05" value="0.5">
+    <span id="confVal">0.5</span>
+    IP:
+    <input id="espIP" value="192.168.1.50">
+    <button onclick="connectESP32(document.getElementById('espIP').value)">
+    Connect
+    </button>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
