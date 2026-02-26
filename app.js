@@ -14,6 +14,10 @@
   let GRID_SIZE = 12;
   let CONFIDENCE_THRESHOLD = 0.5;
   let autoMode = false;
+  let latestBuffer = null;
+
+
+
 
   document.getElementById("gridSize").oninput = e => GRID_SIZE = parseInt(e.target.value);
   document.getElementById("confidence").oninput = e => {
@@ -23,14 +27,29 @@
   document.getElementById("manualBtn").onclick = ()=> autoMode=false;
   document.getElementById("autoBtn").onclick = ()=> autoMode=true;
 
-  // ------------------ ESP32 ------------------
-  let socket;
-  function connectESP32(ip){
-    socket = new WebSocket(`ws://${ip}:81`);
-    socket.onopen = () => console.log("Connected to ESP32");
-    socket.onerror = err => console.log("WebSocket error", err);
-  }
+  // ------------------ ESP32 BLE ------------------
+let device;
+let characteristic;
 
+async function connectBLE(){
+
+  device = await navigator.bluetooth.requestDevice({
+    filters: [{ name: "ESP32_LED_GRID" }],
+    optionalServices: ["12345678-1234-1234-1234-1234567890ab"]
+  });
+
+  const server = await device.gatt.connect();
+
+  const service = await server.getPrimaryService(
+    "12345678-1234-1234-1234-1234567890ab"
+  );
+
+  characteristic = await service.getCharacteristic(
+    "abcdefab-1234-1234-1234-abcdefabcdef"
+  );
+
+  console.log("Connected to ESP32 via BLE");
+}
   // ------------------ PERSPECTIVE GRID ------------------
   let corners = [
     { x: 200, y: 200 },
@@ -284,19 +303,55 @@ canvas.addEventListener('touchend', pointerUp);
     let ledData = { left:null, right:null };
     hands.forEach((h,index)=>{
       if(h.lm.visibility<CONFIDENCE_THRESHOLD) return;
+      
       const px = (1-h.lm.x)*canvas.width;
       const py = h.lm.y*canvas.height;
       const warped = warpPoint(H,px,py);
+      
       if(warped.x>=0 && warped.x<=1 && warped.y>=0 && warped.y<=1){
         const col=Math.floor(warped.x*GRID_SIZE);
         const row=Math.floor(warped.y*GRID_SIZE);
         highlightCell(Hinv,row,col,h.color);
+        
         const ledCol=Math.floor(col/(GRID_SIZE/3));
         const ledRow=Math.floor(row/(GRID_SIZE/3));
-        if(index===0) ledData.left=[ledRow,ledCol]; else ledData.right=[ledRow,ledCol];
+        if(index===0) ledData.left=[ledRow,ledCol]; 
+        else ledData.right=[ledRow,ledCol];
       }
       ctx.beginPath(); ctx.arc(px,py,6,0,2*Math.PI); ctx.fillStyle="white"; ctx.fill();
     });
 
-    if(socket && socket.readyState===1) socket.send(JSON.stringify(ledData));
+ H.delete();
+  Hinv.delete();
+
+
+if(characteristic){
+
+  const buffer = new Uint8Array(4);
+
+  if(ledData.left){
+    buffer[0] = ledData.left[0];
+    buffer[1] = ledData.left[1];
+  } else {
+    buffer[0] = 255;
+    buffer[1] = 255;
   }
+
+  if(ledData.right){
+    buffer[2] = ledData.right[0];
+    buffer[3] = ledData.right[1];
+  } else {
+    buffer[2] = 255;
+    buffer[3] = 255;
+  }
+
+  latestBuffer = buffer;    }};
+
+  setInterval(() => {
+
+  if(!characteristic) return;
+  if(!latestBuffer) return;
+
+  characteristic.writeValueWithoutResponse(latestBuffer);
+
+}, 50);
