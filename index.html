@@ -46,9 +46,8 @@
     <input type="range" id="confidence" min="0" max="1" step="0.05" value="0.5">
     <span id="confVal">0.5</span>
 
-    IP:
-    <input id="espIP" value="192.168.1.50">
-    <button onclick="connectESP32(document.getElementById('espIP').value)">Connect</button>
+    <button onclick="connectBLE()">Connect to LEDs</button>
+
 
     <button id="manualBtn">Manual Grid</button>
     <button id="autoBtn">Auto-align Grid</button>
@@ -56,4 +55,5 @@
 
   <script src="app.js"></script>
 </body>
+
 </html>
