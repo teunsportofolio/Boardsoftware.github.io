@@ -28,6 +28,10 @@ let reviewMode = false;  // true when showing end-climb replay
 const HAND_COLORS = { left: "rgba(180,100,100,0.4)", right: "rgba(100,100,180,0.4)" };
 const FILLED_COLORS = { left: "rgba(180,100,100,0.25)", right: "rgba(100,100,180,0.25)" };
 
+// ------------------ HAND SPEED TRACKING ------------------
+let speedHistory = { left: [], right: [] };
+const SPEED_WINDOW = 5; // rolling average over last 5 moves
+
 // ---------------------- RESET BUTTON ----------------------
 const resetBtn = document.getElementById("resetBtn");
 if(resetBtn){
@@ -60,19 +64,36 @@ document.getElementById("confidence").oninput = e => {
 document.getElementById("manualBtn").onclick = ()=> autoMode=false;
 document.getElementById("autoBtn").onclick = ()=> autoMode=true;
 
+let moveCounter = 0; // Add this near the top, after your filledSequence declaration
+
 function markFilledCell(hand, row, col){
   const key = `${row},${col}`;
-  if(hand === 'left'){
-    if(!filledCells.left[key]){
-      filledCells.left[key] = true;
-      filledSequence.push({hand:'left', row, col});
-    }
-  } else {
-    if(!filledCells.right[key]){
-      filledCells.right[key] = true;
-      filledSequence.push({hand:'right', row, col});
-    }
+  const now = performance.now();
+
+  // Determine hold duration from holdTimers
+  let duration = 0;
+  if(holdTimers[hand][key]){
+    duration = holdTimers[hand][key].total || (now - holdTimers[hand][key].start);
   }
+
+  // Only create new move if it doesn't exist
+  if(!filledCells[hand][key]){
+    filledCells[hand][key] = true;
+    filledSequence.push({
+      sequence: ++moveCounter,
+      hand,
+      row,
+      col,
+      timestamp: now,
+      duration: duration
+    });
+  } else {
+    // Update duration if already filled (hand held longer)
+    const move = filledSequence.find(m => m.hand===hand && m.row===row && m.col===col);
+    if(move) move.duration = Math.max(move.duration, duration);
+  }
+
+  updateStatsUI();  
 }
 
 // ------------------ ESP32 BLE ------------------
@@ -298,16 +319,76 @@ pose.onResults(onResults);
 const cameraMP = new Camera(videoElement,{ onFrame: async()=>{ await pose.send({image:videoElement}); }, width:camWidth, height:camHeight });
 cameraMP.start();
 
+// ------------------ Hand Speed Rolling Average ------------------
+function computeHandSpeeds() {
+  const speeds = { left: [], right: [], leftAvg: 0, rightAvg: 0 };
+  
+  ['left','right'].forEach(hand => {
+    const moves = filledSequence.filter(m => m.hand === hand);
+    if(moves.length >= 2) {
+      for(let i=1; i<moves.length; i++){
+        const prev = moves[i-1];
+        const curr = moves[i];
+        const dx = curr.col - prev.col;
+        const dy = curr.row - prev.row;
+        const dist = Math.hypot(dx, dy);                 // distance in grid cells
+        const dt = (curr.timestamp - prev.timestamp)/1000; // seconds
+        const speed = dt>0 ? dist/dt : 0;
+        speeds[hand].push(speed);
+      }
+      // Average over all moves
+      speeds[hand + 'Avg'] = speeds[hand].length
+        ? speeds[hand].reduce((a,b)=>a+b,0)/speeds[hand].length
+        : 0;
+    }
+  });
+
+  return speeds;
+}
+
+function updateHandSpeedPanel() {
+  const speeds = computeHandSpeeds();
+
+  let panel = document.getElementById('handSpeedPanel');
+  if(!panel){
+    panel = document.createElement('div');
+    panel.id = 'handSpeedPanel';
+    panel.style.position = 'fixed';
+    panel.style.top = '20px';
+    panel.style.left = '20px';
+    panel.style.padding = '8px 12px';
+    panel.style.background = 'rgba(0,0,0,0.6)';
+    panel.style.color = 'white';
+    panel.style.borderRadius = '8px';
+    panel.style.fontFamily = 'appFont';
+    panel.style.fontSize = '14px';
+    panel.style.zIndex = 1000;
+    document.body.appendChild(panel);
+  }
+
+  // Store history for optional graph later
+  speedHistory.left.push(speeds.leftAvg);
+  speedHistory.right.push(speeds.rightAvg);
+
+  if(speedHistory.left.length > 50) speedHistory.left.shift();
+  if(speedHistory.right.length > 50) speedHistory.right.shift();
+
+  panel.innerHTML = `
+  LEFT SPEED: ${speeds.leftAvg.toFixed(2)} moves/sec<br>
+  RIGHT SPEED: ${speeds.rightAvg.toFixed(2)} moves/sec
+  `; 
+}
+
 // ------------------ Pose + Hand + Grid ------------------
 function onResults(results){
-  if(reviewMode) return; // <-- just skip drawing, camera keeps running
-    if(!cvReady) return;
+  if(reviewMode) return; // skip drawing in review mode
+  if(!cvReady) return;
 
-    ctx.save();
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    ctx.scale(-1,1);
-    ctx.drawImage(results.image,-canvas.width,0,canvas.width,canvas.height);
-    ctx.restore();
+  ctx.save();
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.scale(-1,1);
+  ctx.drawImage(results.image,-canvas.width,0,canvas.width,canvas.height);
+  ctx.restore();
 
   const {H,Hinv} = computeHomographies();
   drawPerspectiveGrid(Hinv);
@@ -323,6 +404,8 @@ function onResults(results){
 
     hands.forEach((h,index)=>{
       if(h.lm.visibility < CONFIDENCE_THRESHOLD) return;
+
+      const handName = index===0 ? 'left' : 'right';
       const px = (1-h.lm.x)*canvas.width;
       const py = h.lm.y*canvas.height;
       const warped = warpPoint(H,px,py);
@@ -330,31 +413,57 @@ function onResults(results){
       if(warped.x>=0 && warped.x<=1 && warped.y>=0 && warped.y<=1){
         const col = Math.floor(warped.x*GRID_SIZE);
         const row = Math.floor(warped.y*GRID_SIZE);
+        const key = `${row},${col}`;
 
-        highlightCell(Hinv,row,col,index===0?HAND_COLORS.left:HAND_COLORS.right);
+        highlightCell(Hinv,row,col,handName==='left'?HAND_COLORS.left:HAND_COLORS.right);
 
-        if(index===0){ 
-          ledData.left = [Math.floor(col/(GRID_SIZE/3)), Math.floor(row/(GRID_SIZE/3))];
-          const key=`${row},${col}`;
-          if(holdTimers.left[key]){
-            if(now-holdTimers.left[key]>=HOLD_DURATION) markFilledCell('left',row,col);
-          } else { holdTimers.left={}; holdTimers.left[key]=now; }
+        // Initialize holdTimer object for this hand if needed
+        if(!holdTimers[handName]) holdTimers[handName] = {};
+
+        // If hand is in a cell
+        if(!holdTimers[handName][key]){
+          // Start new timer
+          holdTimers[handName][key] = { start: performance.now(), total: 0 };
         } else {
-          ledData.right = [Math.floor(col/(GRID_SIZE/3)), Math.floor(row/(GRID_SIZE/3))];
-          const key=`${row},${col}`;
-          if(holdTimers.right[key]){
-            if(now-holdTimers.right[key]>=HOLD_DURATION) markFilledCell('right',row,col);
-          } else { holdTimers.right={}; holdTimers.right[key]=now; }
+          // Update elapsed
+          holdTimers[handName][key].total = performance.now() - holdTimers[handName][key].start;
         }
+
+        // Draw progress arc
+        const progress = Math.min(holdTimers[handName][key].total / HOLD_DURATION, 1);
+        ctx.beginPath();
+        ctx.arc(px, py, 8, -Math.PI/2, -Math.PI/2 + progress*2*Math.PI);
+        ctx.strokeStyle = handName==='left' ? 'red' : 'blue';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // If hold reached, mark the cell
+        if(progress >= 1) markFilledCell(handName,row,col);
+
       }
 
+      // Remove timers for cells where hand is NOT currently present
+      if(holdTimers[handName]){
+        Object.keys(holdTimers[handName]).forEach(k=>{
+          if(k !== `${Math.floor(warped.y*GRID_SIZE)},${Math.floor(warped.x*GRID_SIZE)}`){
+            delete holdTimers[handName][k];
+          }
+        });
+      }
+
+      // Draw hand circle
       ctx.beginPath();
       ctx.arc(px,py,6,0,2*Math.PI);
       ctx.fillStyle="white";
       ctx.fill();
     });
-  } else { holdTimers.left={}; holdTimers.right={}; }
 
+  } else {
+    holdTimers.left = {};
+    holdTimers.right = {};
+  }
+
+  // Draw filled cells
   Object.keys(filledCells.left).forEach(k=>{
     const [row,col]=k.split(",").map(Number);
     highlightCell(Hinv,row,col,FILLED_COLORS.left);
@@ -364,8 +473,12 @@ function onResults(results){
     highlightCell(Hinv,row,col,FILLED_COLORS.right);
   });
 
+  // ------------------ HAND SPEED PANEL ------------------
+  updateHandSpeedPanel();
+
   H.delete(); Hinv.delete();
 
+  // ------------------ ESP32 LED update ------------------
   if(characteristic){
     const buffer=new Uint8Array(4);
     if(ledData.left){ buffer[0]=ledData.left[0]; buffer[1]=ledData.left[1]; }
@@ -480,6 +593,124 @@ function hideReplayBar() {
   }, { once: true });
 }
 
+// ------------------ CURRENT MOVE PANEL ------------------
+function updateCurrentMovePanel(idx) {
+  const panel = document.getElementById('currentMovePanel');
+
+  if (idx < 0 || idx >= filledSequence.length) {
+    panel.style.display = 'none';
+    return;
+  }
+
+  const move = filledSequence[idx];
+  panel.style.display = 'block';
+
+  const hand = move.hand?.toLowerCase();
+  const handText =
+    hand === 'left' ? 'LEFT' :
+    hand === 'right' ? 'RIGHT' :
+    hand?.toUpperCase();
+
+  const seconds = move.duration / 1000;
+  const durationSec = seconds.toFixed(1);
+
+  panel.innerHTML = `
+    <div style="position:relative; width:100%; margin-bottom:14px;">
+
+      <img src="images/bg.png"
+           style="
+             width:100%;
+             height:auto;
+             display:block;
+             object-fit:contain;
+           ">
+
+      <img id="panelOverlay"
+           src="${hand === 'left' ? 'images/left.png' : 'images/right.png'}"
+           style="
+             position:absolute;
+             top:0;
+             left:0;
+             width:100%;
+             height:100%;
+             object-fit:contain;
+             opacity:0;
+             transition:opacity 0.2s ease;
+           ">
+
+      <!-- BADGE -->
+      <div id="moveBadge"
+           style="
+             position:absolute;
+             top:8px;
+             right:8px;
+             background:rgba(0,0,0,0.6);
+             padding:4px 8px;
+             font-size:11px;
+             font-weight:600;
+             letter-spacing:1px;
+             border-radius:12px;
+             backdrop-filter:blur(4px);
+             transform:scale(0.8);
+             opacity:0;
+             transition:all 0.25s ease;
+           ">
+        #${idx + 1}
+      </div>
+    </div>
+
+    <div id="panelTextBlock"
+         style="
+           display:flex;
+           flex-direction:column;
+           gap:6px;
+           text-transform:uppercase;
+           letter-spacing:1px;
+         ">
+
+      <div style="font-size:16px; font-weight:600;">
+        ${handText}
+      </div>
+
+      <div style="font-size:12px; opacity:0.8;">
+        ROW ${move.row}  •  COL ${move.col}
+      </div>
+
+      <div style="font-size:12px; opacity:0.8;">
+        HOLD TIME ${durationSec}S
+      </div>
+
+    </div>
+  `;
+
+  const overlay = document.getElementById('panelOverlay');
+  const textBlock = document.getElementById('panelTextBlock');
+  const badge = document.getElementById('moveBadge');
+
+  // -----------------------------
+  // Overlay opacity (instant)
+  // 1s = 10%, 10s+ = 100%
+  // -----------------------------
+  let opacity = seconds / 10;
+  opacity = Math.max(0, Math.min(opacity, 1));
+  overlay.style.opacity = opacity;
+
+  // -----------------------------
+  // Badge bounce animation
+  // -----------------------------
+  requestAnimationFrame(() => {
+    badge.style.opacity = 1;
+    badge.style.transform = 'scale(1.15)';
+    setTimeout(() => {
+      badge.style.transform = 'scale(1)';
+    }, 120);
+  });
+}
+
+function hideCurrentMovePanel() {
+  document.getElementById('currentMovePanel').style.display = 'none';
+}
+
 // ------------------ END CLIMB / REPLAY ------------------
 function getReplayGridDimensions() {
   const gridHeight = canvas.height * 0.7;
@@ -520,6 +751,52 @@ function highlightCellSimple(row, col, color) {
   ctx.fillRect(offsetX + col * wStep, offsetY + row * hStep, wStep, hStep);
 }
 
+function computeStats() {
+  const stats = {
+    totalMoves: filledSequence.length,
+    leftMoves: filledSequence.filter(m => m.hand==='left').length,
+    rightMoves: filledSequence.filter(m => m.hand==='right').length,
+    avgHoldLeft: 0,
+    avgHoldRight: 0,
+    maxHold: 0
+  };
+
+  const leftDurations = filledSequence.filter(m => m.hand==='left').map(m => m.duration);
+  const rightDurations = filledSequence.filter(m => m.hand==='right').map(m => m.duration);
+
+  stats.avgHoldLeft = leftDurations.length ? leftDurations.reduce((a,b)=>a+b,0)/leftDurations.length : 0;
+  stats.avgHoldRight = rightDurations.length ? rightDurations.reduce((a,b)=>a+b,0)/rightDurations.length : 0;
+  stats.maxHold = filledSequence.length ? Math.max(...filledSequence.map(m=>m.duration)) : 0;
+
+  return stats;
+}
+
+function updateStatsUI() {
+  const stats = computeStats();
+  // stats are computed internally and used in code, but not displayed
+}
+
+function showReplayPanel() {
+  const panel = document.getElementById('replayPanel');
+  const { gridWidth, gridHeight, offsetX, offsetY } = getReplayGridDimensions();
+
+  const padding = 16; // extra pixels around the grid
+  panel.style.width = gridWidth + padding * 2 + "px";
+  panel.style.height = gridHeight + padding * 2 + "px";
+
+  panel.style.display = "block";
+}
+
+function hideReplayPanel() {
+  const panel = document.getElementById('replayPanel');
+  panel.style.display = "none";
+}
+
+// Optional: handle resize while replaying
+window.addEventListener("resize", () => {
+  if (reviewMode) showReplayPanel();
+});
+
 function endClimb() {
   if (reviewMode) return;
   if (filledSequence.length === 0) {
@@ -528,6 +805,11 @@ function endClimb() {
   }
 
   reviewMode = true;
+
+  showReplayPanel(); 
+
+  // Show stats for replay mode
+  updateStatsUI();
 
   // 1️⃣ Draw grid immediately
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -559,6 +841,9 @@ function endClimb() {
     }
     currentIndex = idx;
     replaySlider.value = idx;
+
+    // ✅ Update the current move panel
+    updateCurrentMovePanel(idx - 1); // show the last move drawn
   }
 
   // 4️⃣ When bottom bar finishes sliding, show replay bar
@@ -611,7 +896,9 @@ function endClimb() {
   // 6️⃣ Reset button
   replayResetBtn.onclick = () => {
     clearInterval(intervalId);
+    hideReplayPanel();  // hide panel
     hideReplayBar();
+    hideCurrentMovePanel();
     filledCells.left = {};
     filledCells.right = {};
     holdTimers.left = {};
@@ -619,6 +906,8 @@ function endClimb() {
     filledSequence.length = 0;
     reviewMode = false;
     showControls();
+    moveCounter = 0;
+    updateStatsUI();
   };
 
   // 7️⃣ Handle window resize mid-replay
