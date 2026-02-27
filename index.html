@@ -17,7 +17,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <style>
-    body { margin:0; overflow:hidden; background:black; }
+    html {
+      height: 100%;
+      background: url("images/page_bg.jpg") center center / cover no-repeat fixed;
+    }
+
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    body { 
+      margin:0; 
+      overflow:hidden; 
+      background-image: url("images/page_bg.jpg");
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+    }
     canvas {
       position: absolute;
       top: 50%;
@@ -271,6 +289,66 @@
       background: rgba(200,50,50,0.25);
     }
 
+    #currentMovePanel {
+      position: fixed;
+      top: 50%;                     /* vertically centered */
+      left: 20px;                   /* distance from left edge */
+      transform: translateY(-50%);  /* center vertically */
+      width: 12vw;
+      display: flex;
+      padding: 12px 16px;
+      background: rgba(15,15,15,0.65);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 12px;          /* slightly rounded rectangle */
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow:
+        0 8px 30px rgba(0,0,0,0.6),
+        inset 0 0 10px rgba(255,255,255,0.05);
+      font-family: appFont;
+      font-size: 14px;
+      color: white;
+      z-index: 1000;
+      transition: transform 0.5s ease, opacity 0.3s ease;
+      gap: 8px;                     /* space between move info */
+    }
+
+    #currentMovePanel div {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;      /* left-align each row */
+      font-size: 13px;
+      text-align: left;
+    }
+
+    #panelDurationBar {
+      height: 6px;
+      border-radius: 3px;
+    }
+
+    #replayPanel {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      
+      width: 72vh;      /* slightly larger than the grid */
+      height: 72vh;
+      
+      background: rgba(15,15,15,0.65);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      
+      border-radius: 16px;               /* match panel style */
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow:
+        0 8px 30px rgba(0,0,0,0.6),
+        inset 0 0 10px rgba(255,255,255,0.05);
+
+      z-index: 0;  /* behind canvas which is z-index:auto */
+      display: none; /* hidden by default */
+    }
+
 
     /* =========================
        RESPONSIVE
@@ -304,7 +382,10 @@
 </head>
 
 <body>
+  <!-- REPLAY BACKGROUND PANEL -->
+  <div id="replayPanel"></div>
 
+  <!-- VIDEO FOOTAGE AND CANVAS -->
   <video class="input_video"></video>
   <canvas class="output_canvas"></canvas>
 
@@ -340,6 +421,19 @@
   <div id="replayBar" class="bottom-controls controls" style="transform: translate(-50%, 120%); display:none;">
     <input type="range" id="replaySlider" min="0" max="0" value="0" step="1">
     <button id="replayResetBtn">NEW CLIMB</button>
+  </div>
+
+  <div id="currentMovePanel" style="display:none;">
+    <div>Hand: <span id="panelHand"></span></div>
+    <div>Row: <span id="panelRow"></span></div>
+    <div>Col: <span id="panelCol"></span></div>
+    <div style="margin-top:5px;">Duration: <span id="panelDuration"></span> ms</div>
+    
+    <!-- Image indicator -->
+    <div id="durationImageContainer" style="position: relative; width:50px; height:50px;">
+      <img id="durationBg" src="images/bg.png" style="width:100%; height:100%; object-fit:contain;">
+      <img id="durationOverlay" src="" style="position:absolute; top:0; left:0; width:100%; height:100%; object-fit:contain; opacity:0; transition:opacity 0.2s ease;">
+    </div>
   </div>
 
   <script>
