@@ -14,46 +14,387 @@
   <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/three.js/build/ar-threex.js"></script>
 
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <style>
     body { margin:0; overflow:hidden; background:black; }
-    canvas { position:absolute; top:0; left:0; }
+    canvas {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
     video { display:none; }
 
-    .controls {
+    @font-face {
+      font-family: appFont;
+      src: url(Montserrat-Regular.ttf);
+    }
+
+    /* =========================
+       TOP & BOTTOM CONTROL BARS
+       ========================= */
+    .top-controls {
       position: fixed;
-      top:10px;
-      left:10px;
-      background: rgba(0,0,0,0.6);
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: row;    /* horizontal by default */
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: rgba(15,15,15,0.65);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow:
+        0 8px 30px rgba(0,0,0,0.6),
+        inset 0 0 10px rgba(255,255,255,0.05);
+      font-family: appFont;
+      font-size: 14px;
       color: white;
-      padding:10px;
-      border-radius:8px;
-      font-family:sans-serif;
       z-index: 100;
     }
 
-    .controls input, .controls button { margin-top:5px; display:block; }
+    .bottom-controls {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: row;
+      flex-wrap: nowrap;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: rgba(15,15,15,0.65);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow:
+        0 8px 30px rgba(0,0,0,0.6),
+        inset 0 0 10px rgba(255,255,255,0.05);
+      font-family: appFont;
+      font-size: 14px;
+      color: white;
+      z-index: 100;
+      white-space: nowrap;
+      overflow-x: auto;
+    }
+
+    /* =========================
+       BUTTONS
+       ========================= */
+    .controls button {
+      height: 36px;
+      padding: 0 16px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.08);
+      color: white;
+      cursor: pointer;
+      transition: background 0.2s ease, box-shadow 0.2s ease;
+      font-family: appFont;
+      font-size: 13px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .controls button:hover {
+      background: rgba(255,255,255,0.18);
+    }
+
+    #manualBtn.active {
+      background: rgba(0, 150, 255, 0.15);
+      border: 1px solid rgba(0, 150, 255, 0.6);
+      box-shadow:
+        0 0 12px rgba(0, 150, 255, 0.6),
+        inset 0 0 8px rgba(0, 150, 255, 0.4);
+    }
+
+    #autoBtn.active {
+      background: rgba(50, 200, 100, 0.15);
+      border: 1px solid rgba(50, 200, 100, 0.6);
+      box-shadow:
+        0 0 12px rgba(50, 200, 100, 0.6),
+        inset 0 0 8px rgba(50, 200, 100, 0.4);
+    }
+
+    #resetBtn {
+      border: 1px solid rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.08);
+      color: white;
+    }
+
+    #resetBtn:hover {
+      background: rgba(200,50,50,0.25);
+    }
+
+    #endClimbBtn {
+      border: 1px solid rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.08);
+      color: white;
+    }
+
+    #endClimbBtn:hover {
+      background: rgba(255,255,255,0.18);
+    }
+
+    /* =========================
+       GRID & SLIDER GROUPS
+       ========================= */
+    .input-group {
+      display: flex;
+      flex-direction: row;   /* horizontal by default */
+      align-items: center;
+      gap: 6px;
+    }
+
+    .label {
+      white-space: nowrap;
+    }
+
+    .stepper {
+      display: flex;
+      align-items: center;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 999px;
+      overflow: hidden;
+      height: 32px;
+    }
+
+    .stepper button {
+      width: 28px;
+      height: 100%;
+      border: none;
+      background: transparent;
+      color: white;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      line-height: 1;
+      transition: background 0.2s ease;
+    }
+
+    .stepper button:hover {
+      background: rgba(255,255,255,0.15);
+    }
+
+    .stepper input {
+      width: 45px;
+      text-align: center;
+      border: none;
+      background: transparent;
+      color: white;
+      font-family: appFont;
+      font-size: 13px;
+      outline: none;
+    }
+
+    .stepper input::-webkit-inner-spin-button,
+    .stepper input::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    .controls input[type="range"] {
+      accent-color: white;
+      cursor: pointer;
+    }
+
+    .slider-group #confVal {
+      width: 40px;
+      text-align: center;
+    }
+
+    /* Replay bar styling like detection bar */
+    #replayBar {
+      position: fixed;
+      width: auto;
+      bottom: 20px;
+      left: 50%;
+      transform: translate(-50%, 120%);
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      background: rgba(15,15,15,0.65);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.6), inset 0 0 10px rgba(255,255,255,0.05);
+      font-family: appFont;
+      font-size: 14px;
+      color: white;
+      z-index: 1000;
+      transition: transform 0.5s ease;
+    }
+
+    /* Slider inside replay bar */
+    #replaySlider {
+      width: 20vw;
+      margin-left: 12px;
+      accent-color: white;
+      cursor: pointer;
+    }
+
+    /* Reset button */
+    #replayResetBtn {
+      height: 36px;
+      width: auto;
+      padding: 0 16px;
+      margin-left: 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.08);
+      color: white;
+      cursor: pointer;
+      transition: background 0.2s ease, box-shadow 0.2s ease;
+      font-family: appFont;
+      font-size: 13px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    #replayResetBtn:hover {
+      background: rgba(200,50,50,0.25);
+    }
+
+
+    /* =========================
+       RESPONSIVE
+       ========================= */
+    @media screen and (max-width: 620px) {
+    .top-controls {
+      flex-direction: column !important;  /* force vertical stack */
+      align-items: center;
+      gap: 6px;
+      border-radius: 25px;
+      padding-top: 25px;
+      padding-bottom: 25px;
+    }
+
+    .top-controls .input-group {
+      flex-direction: column !important; /* label above input/slider */
+      align-items: center;
+    }
+
+    /* Add extra space below the connect button */
+    .top-controls #connectBtn {
+      margin-bottom: 12px;   /* adjust as needed */
+    }
+
+    /* Add extra space below the grid group */
+    .top-controls .grid-group {
+      margin-bottom: 16px;   /* adjust as needed */
+    }
+  }
   </style>
 </head>
+
 <body>
+
   <video class="input_video"></video>
   <canvas class="output_canvas"></canvas>
 
-  <div class="controls">
-    Grid Size:
-    <input type="number" id="gridSize" value="12" min="2" max="30">
+  <!-- TOP CONTROL BAR -->
+  <div class="top-controls controls">
+    <button id="connectBtn" onclick="connectBLE()">CONNECT</button>
 
-    Confidence:
-    <input type="range" id="confidence" min="0" max="1" step="0.05" value="0.5">
-    <span id="confVal">0.5</span>
+    <div class="grid-group input-group">
+      <span class="label">GRID</span>
+      <div class="stepper">
+        <button onclick="stepGrid(-1)">−</button>
+        <input type="number" id="gridSize" value="5" min="2" max="30">
+        <button onclick="stepGrid(1)">+</button>
+      </div>
+    </div>
 
-    <button onclick="connectBLE()">Connect to LEDs</button>
-
-
-    <button id="manualBtn">Manual Grid</button>
-    <button id="autoBtn">Auto-align Grid</button>
+    <div class="slider-group input-group">
+      <span class="label">CONFIDENCE</span>
+      <input type="range" id="confidence" min="0" max="1" step="0.05" value="0.5">
+      <span id="confVal">0.5</span>
+    </div>
   </div>
 
-  <script src="app.js"></script>
-</body>
+  <!-- BOTTOM CONTROL BAR -->
+  <div class="bottom-controls controls">
+    <button id="resetBtn">RESET</button>
+    <button id="manualBtn" class="active">MANUAL</button>
+    <button id="autoBtn">AUTO</button>
+    <button id="endClimbBtn" onclick="endClimb()">END CLIMB</button>
+  </div>
 
+  <!-- REPLAY BOTTOM BAR -->
+  <div id="replayBar" class="bottom-controls controls" style="transform: translate(-50%, 120%); display:none;">
+    <input type="range" id="replaySlider" min="0" max="0" value="0" step="1">
+    <button id="replayResetBtn">NEW CLIMB</button>
+  </div>
+
+  <script>
+    /* GRID STEPPER */
+    function stepGrid(direction) {
+      const input = document.getElementById("gridSize");
+      let value = parseInt(input.value);
+      const min = parseInt(input.min);
+      const max = parseInt(input.max);
+
+      value += direction;
+      if (value >= min && value <= max) {
+        input.value = value;
+        input.dispatchEvent(new Event("input"));
+      }
+    }
+
+    /* BLE ACTIVE STATE */
+    function setBLEActive(isActive) {
+      const btn = document.getElementById("connectBtn");
+      if (isActive) {
+        btn.classList.add("active");
+      } else {
+        btn.classList.remove("active");
+      }
+    }
+
+    /* MODE SWITCHING */
+    const manualBtn = document.getElementById("manualBtn");
+    const autoBtn = document.getElementById("autoBtn");
+
+    manualBtn.addEventListener("click", () => {
+      manualBtn.classList.add("active");
+      autoBtn.classList.remove("active");
+    });
+
+    autoBtn.addEventListener("click", () => {
+      autoBtn.classList.add("active");
+      manualBtn.classList.remove("active");
+    });
+
+    /* END CLIMB */
+    function endClimb() {
+      alert("Climb ended!");
+    }
+
+    /* CONFIDENCE DISPLAY */
+    const confidenceSlider = document.getElementById("confidence");
+    const confVal = document.getElementById("confVal");
+    confidenceSlider.addEventListener("input", () => {
+      confVal.textContent = confidenceSlider.value;
+    });
+  </script>
+
+  <script src="app.js"></script>
+
+</body>
 </html>
