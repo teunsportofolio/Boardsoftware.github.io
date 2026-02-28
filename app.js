@@ -19,10 +19,10 @@ let latestBuffer = null;
 
 // ---------------------- HOLD-TO-FILL & PERSISTENT FILLS ----------------------
 let holdTimers = {
-  leftHand: {},
-  rightHand: {},
-  leftFoot: {},
-  rightFoot: {}
+  leftHand: { currentKey: null, start: 0 },
+  rightHand:{ currentKey: null, start: 0 },
+  leftFoot: { currentKey: null, start: 0 },
+  rightFoot:{ currentKey: null, start: 0 }
 };
 
 let filledCells = {
@@ -91,31 +91,29 @@ document.getElementById("autoBtn").onclick = ()=> autoMode=true;
 
 let moveCounter = 0; // Add this near the top, after your filledSequence declaration
 
-function markFilledCell(limb, row, col){
+function markFilledCell(limb, row, col, duration){
   const key = `${row},${col}`;
   const now = performance.now();
 
-  // Determine hold duration from holdTimers
-  let duration = 0;
-  if(holdTimers[limb][key]){
-    duration = holdTimers[limb][key].total || (now - holdTimers[limb][key].start);
-  }
-
-  // Only create new move if it doesn't exist
   if(!filledCells[limb][key]){
-    filledCells[limb][key] = true;
+    // First time filled
+    filledCells[limb][key] = { duration };
     filledSequence.push({
       sequence: ++moveCounter,
-      limb: limb,    
+      limb,
       row,
       col,
       timestamp: now,
       duration
     });
   } else {
-    // Update duration if already filled (limb held longer)
+    // Update duration if the limb is still holding the cell
     const move = filledSequence.find(m => m.limb===limb && m.row===row && m.col===col);
-    if(move) move.duration = Math.max(move.duration, duration);
+    if(move){
+      // Only increase, never decrease
+      move.duration = Math.max(move.duration, duration);
+      filledCells[limb][key].duration = move.duration;
+    }
   }
 
   updateStatsUI();  
@@ -415,7 +413,7 @@ function updateLimbSpeedPanel() {
 
 // ------------------ Pose + Hand + Grid ------------------
 function onResults(results){
-  if(reviewMode) return; // skip drawing in review mode
+  if(reviewMode) return; // skip detection view when replaying
   if(!cvReady) return;
 
   ctx.save();
@@ -447,85 +445,82 @@ function onResults(results){
       if(!limb.lm || limb.lm.visibility < CONFIDENCE_THRESHOLD) return;
 
       const limbName = limb.name;
-
       const px = (1 - limb.lm.x) * canvas.width;
       const py = limb.lm.y * canvas.height;
-
       const warped = warpPoint(H, px, py);
 
       if(warped.x>=0 && warped.x<=1 && warped.y>=0 && warped.y<=1){
-
         const col = Math.floor(warped.x*GRID_SIZE);
         const row = Math.floor(warped.y*GRID_SIZE);
         const key = `${row},${col}`;
 
-        ledData[limbName] = [row, col];
-
-        highlightCell(Hinv,row,col,LIMB_COLORS[limbName]);
-
-        if(!holdTimers[limbName][key]){
-          holdTimers[limbName][key] = { start: performance.now(), total: 0 };
-        } else {
-          holdTimers[limbName][key].total =
-            performance.now() - holdTimers[limbName][key].start;
+        // Start new timer if limb entered a different cell
+        if(holdTimers[limbName].currentKey !== key){
+          holdTimers[limbName].currentKey = key;
+          holdTimers[limbName].start = performance.now();
         }
 
-        const progress =
-          Math.min(holdTimers[limbName][key].total / HOLD_DURATION, 1);
+        const duration = performance.now() - holdTimers[limbName].start;
+        const progress = Math.min(duration / HOLD_DURATION, 1);
 
+        // Draw highlight for cell being held
+        highlightCell(Hinv, row, col, LIMB_COLORS[limbName]);
+
+        // Draw limb arc for hold progress
         ctx.beginPath();
         ctx.arc(px, py, 8, -Math.PI/2, -Math.PI/2 + progress*2*Math.PI);
         ctx.strokeStyle = LIMB_COLORS[limbName];
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        if(progress >= 1) markFilledCell(limbName,row,col);
+        // Mark filled cell if hold >= 1s, passing real duration
+        if(duration >= HOLD_DURATION){
+          markFilledCell(limbName, row, col, duration);
+        }
+
+        ledData[limbName] = [row, col];
+      } else {
+        // Limb left grid, reset timer
+        holdTimers[limbName].currentKey = null;
+        holdTimers[limbName].start = 0;
       }
 
+      // Draw limb position
       ctx.beginPath();
-      ctx.arc(px,py,6,0,2*Math.PI);
-      ctx.fillStyle="white";
+      ctx.arc(px, py, 6, 0, 2*Math.PI);
+      ctx.fillStyle = "white";
       ctx.fill();
     });
-
   } else {
+    // No landmarks, reset timers
     Object.keys(holdTimers).forEach(l => holdTimers[l] = {});
   }
 
-  // Draw filled cells
+  // Draw all filled cells
   Object.keys(filledCells).forEach(limbName => {
     Object.keys(filledCells[limbName]).forEach(k=>{
-      const [row,col]=k.split(",").map(Number);
+      const [row,col] = k.split(",").map(Number);
       highlightCell(Hinv,row,col,FILLED_COLORS[limbName]);
     });
   });
 
-  // ------------------ HAND SPEED PANEL ------------------
+  // Update hand speed panel
   updateLimbSpeedPanel();
 
   H.delete(); Hinv.delete();
 
-  // ------------------ ESP32 LED update ------------------
+  // ESP32 update
   if(characteristic){
     const buffer = new Uint8Array(8);
-
-    const limbsOrder = [
-      'leftHand',
-      'rightHand',
-      'leftFoot',
-      'rightFoot'
-    ];
-
-    limbsOrder.forEach((limb, i) => {
+    const limbsOrder = ['leftHand','rightHand','leftFoot','rightFoot'];
+    limbsOrder.forEach((limb,i)=>{
       if(ledData[limb]){
-        buffer[i*2]     = ledData[limb][0]; // row
-        buffer[i*2 + 1] = ledData[limb][1]; // col
+        buffer[i*2]     = ledData[limb][0];
+        buffer[i*2 + 1] = ledData[limb][1];
       } else {
-        buffer[i*2]     = 255;
-        buffer[i*2 + 1] = 255;
+        buffer[i*2] = buffer[i*2+1] = 255;
       }
     });
-
     latestBuffer = buffer;
   }
 }
