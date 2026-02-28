@@ -16,30 +16,57 @@ let CONFIDENCE_THRESHOLD = 0.5;
 let autoMode = false;
 let latestBuffer = null;
 
+
 // ---------------------- HOLD-TO-FILL & PERSISTENT FILLS ----------------------
-let holdTimers = { left: {}, right: {} };
+let holdTimers = {
+  leftHand: {},
+  rightHand: {},
+  leftFoot: {},
+  rightFoot: {}
+};
+
+let filledCells = {
+  leftHand: {},
+  rightHand: {},
+  leftFoot: {},
+  rightFoot: {}
+};
+
 const HOLD_DURATION = 1000; // milliseconds
 
-let filledCells = { left: {}, right: {} };
 let filledSequence = []; // for end-climb animation
 let reviewMode = false;  // true when showing end-climb replay
 
 // Muted colors
-const HAND_COLORS = { left: "rgba(180,100,100,0.4)", right: "rgba(100,100,180,0.4)" };
-const FILLED_COLORS = { left: "rgba(180,100,100,0.25)", right: "rgba(100,100,180,0.25)" };
+const LIMB_COLORS = {
+  leftHand: "rgba(180,100,100,0.4)",
+  rightHand: "rgba(100,100,180,0.4)",
+  leftFoot: "rgba(100,180,100,0.4)",
+  rightFoot: "rgba(180,180,100,0.4)"
+};
+
+const FILLED_COLORS = {
+  leftHand: "rgba(180,100,100,0.25)",
+  rightHand: "rgba(100,100,180,0.25)",
+  leftFoot: "rgba(100,180,100,0.25)",
+  rightFoot: "rgba(180,180,100,0.25)"
+};
 
 // ------------------ HAND SPEED TRACKING ------------------
-let speedHistory = { left: [], right: [] };
+let speedHistory = {
+  leftHand: [],
+  rightHand: [],
+  leftFoot: [],
+  rightFoot: []
+};
 const SPEED_WINDOW = 5; // rolling average over last 5 moves
 
 // ---------------------- RESET BUTTON ----------------------
 const resetBtn = document.getElementById("resetBtn");
 if(resetBtn){
   resetBtn.addEventListener("click", () => {
-    filledCells.left = {};
-    filledCells.right = {};
-    holdTimers.left = {};
-    holdTimers.right = {};
+    Object.keys(filledCells).forEach(l => filledCells[l] = {});
+    Object.keys(holdTimers).forEach(l => holdTimers[l] = {});
     filledSequence = [];
   });
 }
@@ -48,10 +75,8 @@ if(resetBtn){
 const gridInput = document.getElementById("gridSize");
 if(gridInput){
   gridInput.addEventListener("input", () => {
-    filledCells.left = {};
-    filledCells.right = {};
-    holdTimers.left = {};
-    holdTimers.right = {};
+    Object.keys(filledCells).forEach(l => filledCells[l] = {});
+    Object.keys(holdTimers).forEach(l => holdTimers[l] = {});
     filledSequence = [];
   });
 }
@@ -66,30 +91,30 @@ document.getElementById("autoBtn").onclick = ()=> autoMode=true;
 
 let moveCounter = 0; // Add this near the top, after your filledSequence declaration
 
-function markFilledCell(hand, row, col){
+function markFilledCell(limb, row, col){
   const key = `${row},${col}`;
   const now = performance.now();
 
   // Determine hold duration from holdTimers
   let duration = 0;
-  if(holdTimers[hand][key]){
-    duration = holdTimers[hand][key].total || (now - holdTimers[hand][key].start);
+  if(holdTimers[limb][key]){
+    duration = holdTimers[limb][key].total || (now - holdTimers[limb][key].start);
   }
 
   // Only create new move if it doesn't exist
-  if(!filledCells[hand][key]){
-    filledCells[hand][key] = true;
+  if(!filledCells[limb][key]){
+    filledCells[limb][key] = true;
     filledSequence.push({
       sequence: ++moveCounter,
-      hand,
+      limb: limb,    
       row,
       col,
       timestamp: now,
-      duration: duration
+      duration
     });
   } else {
-    // Update duration if already filled (hand held longer)
-    const move = filledSequence.find(m => m.hand===hand && m.row===row && m.col===col);
+    // Update duration if already filled (limb held longer)
+    const move = filledSequence.find(m => m.limb===limb && m.row===row && m.col===col);
     if(move) move.duration = Math.max(move.duration, duration);
   }
 
@@ -320,25 +345,32 @@ const cameraMP = new Camera(videoElement,{ onFrame: async()=>{ await pose.send({
 cameraMP.start();
 
 // ------------------ Hand Speed Rolling Average ------------------
-function computeHandSpeeds() {
-  const speeds = { left: [], right: [], leftAvg: 0, rightAvg: 0 };
-  
-  ['left','right'].forEach(hand => {
-    const moves = filledSequence.filter(m => m.hand === hand);
-    if(moves.length >= 2) {
-      for(let i=1; i<moves.length; i++){
+function computeLimbSpeeds() {
+  const speeds = {};
+
+  const limbs = ['leftHand','rightHand','leftFoot','rightFoot'];
+
+  limbs.forEach(limb => {
+    const moves = filledSequence.filter(m => m.limb === limb);
+    speeds[limb] = { values: [], avg: 0 };
+
+    if(moves.length >= 2){
+      for(let i = 1; i < moves.length; i++){
         const prev = moves[i-1];
         const curr = moves[i];
+
         const dx = curr.col - prev.col;
         const dy = curr.row - prev.row;
-        const dist = Math.hypot(dx, dy);                 // distance in grid cells
-        const dt = (curr.timestamp - prev.timestamp)/1000; // seconds
-        const speed = dt>0 ? dist/dt : 0;
-        speeds[hand].push(speed);
+        const dist = Math.hypot(dx, dy);
+
+        const dt = (curr.timestamp - prev.timestamp) / 1000;
+        const speed = dt > 0 ? dist / dt : 0;
+
+        speeds[limb].values.push(speed);
       }
-      // Average over all moves
-      speeds[hand + 'Avg'] = speeds[hand].length
-        ? speeds[hand].reduce((a,b)=>a+b,0)/speeds[hand].length
+
+      speeds[limb].avg = speeds[limb].values.length
+        ? speeds[limb].values.reduce((a,b)=>a+b,0) / speeds[limb].values.length
         : 0;
     }
   });
@@ -346,8 +378,8 @@ function computeHandSpeeds() {
   return speeds;
 }
 
-function updateHandSpeedPanel() {
-  const speeds = computeHandSpeeds();
+function updateLimbSpeedPanel() {
+  const speeds = computeLimbSpeeds();
 
   let panel = document.getElementById('handSpeedPanel');
   if(!panel){
@@ -366,17 +398,19 @@ function updateHandSpeedPanel() {
     document.body.appendChild(panel);
   }
 
-  // Store history for optional graph later
-  speedHistory.left.push(speeds.leftAvg);
-  speedHistory.right.push(speeds.rightAvg);
-
-  if(speedHistory.left.length > 50) speedHistory.left.shift();
-  if(speedHistory.right.length > 50) speedHistory.right.shift();
+  // Store history
+  Object.keys(speedHistory).forEach(limb => {
+    speedHistory[limb].push(speeds[limb].avg);
+    if(speedHistory[limb].length > 50)
+      speedHistory[limb].shift();
+  });
 
   panel.innerHTML = `
-  LEFT SPEED: ${speeds.leftAvg.toFixed(2)} moves/sec<br>
-  RIGHT SPEED: ${speeds.rightAvg.toFixed(2)} moves/sec
-  `; 
+    LH: ${speeds.leftHand.avg.toFixed(2)} moves/sec<br>
+    RH: ${speeds.rightHand.avg.toFixed(2)} moves/sec<br>
+    LF: ${speeds.leftFoot.avg.toFixed(2)} moves/sec<br>
+    RF: ${speeds.rightFoot.avg.toFixed(2)} moves/sec
+  `;
 }
 
 // ------------------ Pose + Hand + Grid ------------------
@@ -394,64 +428,60 @@ function onResults(results){
   drawPerspectiveGrid(Hinv);
 
   const now = performance.now();
-  let ledData = { left:null, right:null };
+  let ledData = {
+    leftHand: null,
+    rightHand: null,
+    leftFoot: null,
+    rightFoot: null
+  };
 
   if(results.poseLandmarks){
-    const hands = [
-      { lm: results.poseLandmarks[15], color: HAND_COLORS.left },
-      { lm: results.poseLandmarks[16], color: HAND_COLORS.right }
+    const limbs = [
+      { name: 'leftHand',  lm: results.poseLandmarks[15] },  // LEFT_WRIST
+      { name: 'rightHand', lm: results.poseLandmarks[16] },  // RIGHT_WRIST
+      { name: 'leftFoot',  lm: results.poseLandmarks[27] },  // LEFT_ANKLE
+      { name: 'rightFoot', lm: results.poseLandmarks[28] }   // RIGHT_ANKLE
     ];
 
-    hands.forEach((h,index)=>{
-      if(h.lm.visibility < CONFIDENCE_THRESHOLD) return;
+    limbs.forEach(limb => {
+      if(!limb.lm || limb.lm.visibility < CONFIDENCE_THRESHOLD) return;
 
-      const handName = index===0 ? 'left' : 'right';
-      const px = (1-h.lm.x)*canvas.width;
-      const py = h.lm.y*canvas.height;
-      const warped = warpPoint(H,px,py);
+      const limbName = limb.name;
+
+      const px = (1 - limb.lm.x) * canvas.width;
+      const py = limb.lm.y * canvas.height;
+
+      const warped = warpPoint(H, px, py);
 
       if(warped.x>=0 && warped.x<=1 && warped.y>=0 && warped.y<=1){
+
         const col = Math.floor(warped.x*GRID_SIZE);
         const row = Math.floor(warped.y*GRID_SIZE);
         const key = `${row},${col}`;
 
-        highlightCell(Hinv,row,col,handName==='left'?HAND_COLORS.left:HAND_COLORS.right);
+        ledData[limbName] = [row, col];
 
-        // Initialize holdTimer object for this hand if needed
-        if(!holdTimers[handName]) holdTimers[handName] = {};
+        highlightCell(Hinv,row,col,LIMB_COLORS[limbName]);
 
-        // If hand is in a cell
-        if(!holdTimers[handName][key]){
-          // Start new timer
-          holdTimers[handName][key] = { start: performance.now(), total: 0 };
+        if(!holdTimers[limbName][key]){
+          holdTimers[limbName][key] = { start: performance.now(), total: 0 };
         } else {
-          // Update elapsed
-          holdTimers[handName][key].total = performance.now() - holdTimers[handName][key].start;
+          holdTimers[limbName][key].total =
+            performance.now() - holdTimers[limbName][key].start;
         }
 
-        // Draw progress arc
-        const progress = Math.min(holdTimers[handName][key].total / HOLD_DURATION, 1);
+        const progress =
+          Math.min(holdTimers[limbName][key].total / HOLD_DURATION, 1);
+
         ctx.beginPath();
         ctx.arc(px, py, 8, -Math.PI/2, -Math.PI/2 + progress*2*Math.PI);
-        ctx.strokeStyle = handName==='left' ? 'red' : 'blue';
+        ctx.strokeStyle = LIMB_COLORS[limbName];
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // If hold reached, mark the cell
-        if(progress >= 1) markFilledCell(handName,row,col);
-
+        if(progress >= 1) markFilledCell(limbName,row,col);
       }
 
-      // Remove timers for cells where hand is NOT currently present
-      if(holdTimers[handName]){
-        Object.keys(holdTimers[handName]).forEach(k=>{
-          if(k !== `${Math.floor(warped.y*GRID_SIZE)},${Math.floor(warped.x*GRID_SIZE)}`){
-            delete holdTimers[handName][k];
-          }
-        });
-      }
-
-      // Draw hand circle
       ctx.beginPath();
       ctx.arc(px,py,6,0,2*Math.PI);
       ctx.fillStyle="white";
@@ -459,33 +489,44 @@ function onResults(results){
     });
 
   } else {
-    holdTimers.left = {};
-    holdTimers.right = {};
+    Object.keys(holdTimers).forEach(l => holdTimers[l] = {});
   }
 
   // Draw filled cells
-  Object.keys(filledCells.left).forEach(k=>{
-    const [row,col]=k.split(",").map(Number);
-    highlightCell(Hinv,row,col,FILLED_COLORS.left);
-  });
-  Object.keys(filledCells.right).forEach(k=>{
-    const [row,col]=k.split(",").map(Number);
-    highlightCell(Hinv,row,col,FILLED_COLORS.right);
+  Object.keys(filledCells).forEach(limbName => {
+    Object.keys(filledCells[limbName]).forEach(k=>{
+      const [row,col]=k.split(",").map(Number);
+      highlightCell(Hinv,row,col,FILLED_COLORS[limbName]);
+    });
   });
 
   // ------------------ HAND SPEED PANEL ------------------
-  updateHandSpeedPanel();
+  updateLimbSpeedPanel();
 
   H.delete(); Hinv.delete();
 
   // ------------------ ESP32 LED update ------------------
   if(characteristic){
-    const buffer=new Uint8Array(4);
-    if(ledData.left){ buffer[0]=ledData.left[0]; buffer[1]=ledData.left[1]; }
-    else { buffer[0]=255; buffer[1]=255; }
-    if(ledData.right){ buffer[2]=ledData.right[0]; buffer[3]=ledData.right[1]; }
-    else { buffer[2]=255; buffer[3]=255; }
-    latestBuffer=buffer;
+    const buffer = new Uint8Array(8);
+
+    const limbsOrder = [
+      'leftHand',
+      'rightHand',
+      'leftFoot',
+      'rightFoot'
+    ];
+
+    limbsOrder.forEach((limb, i) => {
+      if(ledData[limb]){
+        buffer[i*2]     = ledData[limb][0]; // row
+        buffer[i*2 + 1] = ledData[limb][1]; // col
+      } else {
+        buffer[i*2]     = 255;
+        buffer[i*2 + 1] = 255;
+      }
+    });
+
+    latestBuffer = buffer;
   }
 }
 
@@ -526,14 +567,6 @@ resizeCanvas();
 window.addEventListener("resize", resizeCanvas);
 
 // ------------------ END CLIMB / REPLAY ------------------
-function highlightCellSimple(row, col, color) {
-  const { gridWidth, gridHeight, offsetX, offsetY } = getReplayGridDimensions();
-  const wStep = gridWidth / GRID_SIZE;
-  const hStep = gridHeight / GRID_SIZE;
-  ctx.fillStyle = color;
-  ctx.fillRect(offsetX + col * wStep, offsetY + row * hStep, wStep, hStep);
-}
-
 function hideControls() {
   const topBar = document.querySelector('.top-controls');
   const bottomBar = document.querySelector('.bottom-controls');
@@ -605,28 +638,31 @@ function updateCurrentMovePanel(idx) {
   const move = filledSequence[idx];
   panel.style.display = 'block';
 
-  const hand = move.hand?.toLowerCase();
-  const handText =
-    hand === 'left' ? 'LEFT' :
-    hand === 'right' ? 'RIGHT' :
-    hand?.toUpperCase();
+  const limb = move.limb;
+  const isHand = limb.includes('Hand');
+  const isLeft = limb.includes('left');
+
+  const limbText = limb
+    .replace('Hand',' HAND')
+    .replace('Foot',' FOOT')
+    .toUpperCase();
 
   const seconds = move.duration / 1000;
   const durationSec = seconds.toFixed(1);
+
+  const overlayImage =
+    isHand
+      ? (isLeft ? 'images/l-hand.png' : 'images/r-hand.png')
+      : (isLeft ? 'images/l-foot.png' : 'images/r-foot.png');
 
   panel.innerHTML = `
     <div style="position:relative; width:100%; margin-bottom:14px;">
 
       <img src="images/bg.png"
-           style="
-             width:100%;
-             height:auto;
-             display:block;
-             object-fit:contain;
-           ">
+           style="width:100%; height:auto; display:block; object-fit:contain;">
 
       <img id="panelOverlay"
-           src="${hand === 'left' ? 'images/left.png' : 'images/right.png'}"
+           src="${overlayImage}"
            style="
              position:absolute;
              top:0;
@@ -638,7 +674,6 @@ function updateCurrentMovePanel(idx) {
              transition:opacity 0.2s ease;
            ">
 
-      <!-- BADGE -->
       <div id="moveBadge"
            style="
              position:absolute;
@@ -669,7 +704,7 @@ function updateCurrentMovePanel(idx) {
          ">
 
       <div style="font-size:16px; font-weight:600;">
-        ${handText}
+        ${limbText}
       </div>
 
       <div style="font-size:12px; opacity:0.8;">
@@ -684,20 +719,12 @@ function updateCurrentMovePanel(idx) {
   `;
 
   const overlay = document.getElementById('panelOverlay');
-  const textBlock = document.getElementById('panelTextBlock');
   const badge = document.getElementById('moveBadge');
 
-  // -----------------------------
-  // Overlay opacity (instant)
-  // 1s = 10%, 10s+ = 100%
-  // -----------------------------
   let opacity = seconds / 10;
   opacity = Math.max(0, Math.min(opacity, 1));
   overlay.style.opacity = opacity;
 
-  // -----------------------------
-  // Badge bounce animation
-  // -----------------------------
   requestAnimationFrame(() => {
     badge.style.opacity = 1;
     badge.style.transform = 'scale(1.15)';
@@ -754,19 +781,34 @@ function highlightCellSimple(row, col, color) {
 function computeStats() {
   const stats = {
     totalMoves: filledSequence.length,
-    leftMoves: filledSequence.filter(m => m.hand==='left').length,
-    rightMoves: filledSequence.filter(m => m.hand==='right').length,
+    leftMoves: filledSequence.filter(m => m.limb==='leftHand').length,
+    rightMoves: filledSequence.filter(m => m.limb==='rightHand').length,
+    leftFootMoves: filledSequence.filter(m => m.limb==='leftFoot').length,
+    rightFootMoves: filledSequence.filter(m => m.limb==='rightFoot').length,
     avgHoldLeft: 0,
     avgHoldRight: 0,
     maxHold: 0
   };
 
-  const leftDurations = filledSequence.filter(m => m.hand==='left').map(m => m.duration);
-  const rightDurations = filledSequence.filter(m => m.hand==='right').map(m => m.duration);
+  const leftDurations = filledSequence
+    .filter(m => m.limb==='leftHand')
+    .map(m => m.duration);
 
-  stats.avgHoldLeft = leftDurations.length ? leftDurations.reduce((a,b)=>a+b,0)/leftDurations.length : 0;
-  stats.avgHoldRight = rightDurations.length ? rightDurations.reduce((a,b)=>a+b,0)/rightDurations.length : 0;
-  stats.maxHold = filledSequence.length ? Math.max(...filledSequence.map(m=>m.duration)) : 0;
+  const rightDurations = filledSequence
+    .filter(m => m.limb==='rightHand')
+    .map(m => m.duration);
+
+  stats.avgHoldLeft = leftDurations.length
+    ? leftDurations.reduce((a,b)=>a+b,0)/leftDurations.length
+    : 0;
+
+  stats.avgHoldRight = rightDurations.length
+    ? rightDurations.reduce((a,b)=>a+b,0)/rightDurations.length
+    : 0;
+
+  stats.maxHold = filledSequence.length
+    ? Math.max(...filledSequence.map(m=>m.duration))
+    : 0;
 
   return stats;
 }
@@ -836,7 +878,7 @@ function endClimb() {
     drawSimpleGrid();
     for (let i = 0; i < idx; i++) {
       const item = filledSequence[i];
-      const color = item.hand === 'left' ? FILLED_COLORS.left : FILLED_COLORS.right;
+      const color = FILLED_COLORS[item.limb];
       highlightCellSimple(item.row, item.col, color);
     }
     currentIndex = idx;
@@ -899,10 +941,8 @@ function endClimb() {
     hideReplayPanel();  // hide panel
     hideReplayBar();
     hideCurrentMovePanel();
-    filledCells.left = {};
-    filledCells.right = {};
-    holdTimers.left = {};
-    holdTimers.right = {};
+    Object.keys(filledCells).forEach(l => filledCells[l] = {});
+    Object.keys(holdTimers).forEach(l => holdTimers[l] = {});
     filledSequence.length = 0;
     reviewMode = false;
     showControls();
