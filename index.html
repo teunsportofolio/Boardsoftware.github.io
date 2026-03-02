@@ -105,6 +105,11 @@
       overflow-x: auto;
     }
 
+    .top-controls,
+    .bottom-controls {
+      display: none;
+    }
+
     /* =========================
        BUTTONS
        ========================= */
@@ -349,6 +354,107 @@
       display: none; /* hidden by default */
     }
 
+    /* =========================
+   LOGIN OVERLAY
+   ========================= */
+    #loginOverlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      z-index: 2000;
+      transition: opacity 0.4s ease;
+    }
+
+    /* =========================
+      LOGIN PANEL
+      ========================= */
+    #loginPanel {
+      width: 320px;
+      padding: 30px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+
+      background: rgba(15,15,15,0.65);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow:
+        0 8px 30px rgba(0,0,0,0.6),
+        inset 0 0 10px rgba(255,255,255,0.05);
+
+      font-family: appFont;
+      color: white;
+
+      transform: scale(1);
+      transition: transform 0.3s ease;
+    }
+
+    .login-title {
+      text-align: center;
+      font-size: 18px;
+      letter-spacing: 2px;
+      margin-bottom: 5px;
+    }
+
+    .login-input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 13px;
+    }
+
+    .login-input-group input {
+      height: 36px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.08);
+      color: white;
+      padding: 0 14px;
+      outline: none;
+      font-family: appFont;
+      transition: background 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .login-input-group input:focus {
+      background: rgba(255,255,255,0.18);
+      box-shadow: 0 0 10px rgba(0,150,255,0.4);
+    }
+
+    #loginBtn {
+      height: 40px;
+      margin-top: 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(0,150,255,0.6);
+      background: rgba(0,150,255,0.15);
+      color: white;
+      font-family: appFont;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    #loginBtn:hover {
+      background: rgba(0,150,255,0.3);
+      box-shadow:
+        0 0 12px rgba(0,150,255,0.6),
+        inset 0 0 8px rgba(0,150,255,0.4);
+    }
+
+    /* Hide animation */
+    #loginOverlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
 
     /* =========================
        RESPONSIVE
@@ -382,6 +488,25 @@
 </head>
 
 <body>
+  <!-- LOGIN PANEL -->
+  <div id="loginOverlay">
+    <div id="loginPanel">
+      <div class="login-title">LOGIN</div>
+
+      <div class="login-input-group">
+        <label>Name</label>
+        <input type="text" id="loginName" placeholder="Enter your name">
+      </div>
+
+      <div class="login-input-group">
+        <label>Password</label>
+        <input type="password" id="loginPassword" placeholder="Enter password">
+      </div>
+
+      <button id="loginBtn">ENTER</button>
+    </div>
+  </div>
+
   <!-- REPLAY BACKGROUND PANEL -->
   <div id="replayPanel"></div>
 
@@ -475,20 +600,16 @@
       manualBtn.classList.remove("active");
     });
 
-    /* END CLIMB */
-    function endClimb() {
-      alert("Climb ended!");
-    }
-
     /* CONFIDENCE DISPLAY */
     const confidenceSlider = document.getElementById("confidence");
     const confVal = document.getElementById("confVal");
     confidenceSlider.addEventListener("input", () => {
       confVal.textContent = confidenceSlider.value;
     });
+
   </script>
 
-  <script src="app.js"></script>
+  <script src="app.js" defer></script>
 
 </body>
 </html>
