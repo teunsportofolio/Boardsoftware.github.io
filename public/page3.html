@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Climb Index</title>
+<style>
+#list div { 
+  padding:6px; 
+  border-bottom:1px solid #ccc; 
+  cursor:pointer; 
+  display:flex; 
+  justify-content: space-between; 
+  align-items: center;
+}
+.tags { font-size: 0.9em; color: #555; margin-left: 10px; }
+#grid { display:grid; grid-template-columns:repeat(18,25px); gap:2px; margin-top:20px }
+.cell { width:25px; height:25px; background:#eee }
+</style>
+</head>
+<body>
+<h2>Saved Climbs</h2>
+
+Min Grade 
+<select id="minG"></select>
+Max Grade 
+<select id="maxG"></select>
+Angle 
+<select id="angle"></select>
+<button id="filterBtn">Filter</button>
+
+<div id="list"></div>
+<div id="grid"></div>
+<div id="climbDetails" style="margin-top:10px; font-size:0.9em; color:#555"></div>
+<script>
+const listDiv = document.getElementById('list');
+const gridDiv = document.getElementById('grid');
+const minGSelect = document.getElementById('minG');
+const maxGSelect = document.getElementById('maxG');
+const angleSelect = document.getElementById('angle');
+const filterBtn = document.getElementById('filterBtn');
+
+const grades = ['3','4','5A','5B','5C','6A','6B','6C','7A','7B','7C','8A'];
+grades.forEach(g => {
+  minGSelect.appendChild(new Option(g,g));
+  maxGSelect.appendChild(new Option(g,g));
+});
+
+// Set default selection to full range
+minGSelect.value = grades[0]; // '3'
+maxGSelect.value = grades[grades.length-1];
+
+const anyOption = document.createElement('option');
+anyOption.value = '';      // empty value means no filter
+anyOption.textContent = 'Any';
+angleSelect.appendChild(anyOption);
+
+// Populate angle dropdown (20 to 60 in steps of 5)
+for(let a=20; a<=60; a+=5){
+  const opt = document.createElement('option'); 
+  opt.value = a; 
+  opt.textContent = a;
+  angleSelect.appendChild(opt);
+}
+
+// Helper for grade comparison
+const gradeOrder = grades;
+function gradeCompare(g1, g2){ return gradeOrder.indexOf(g1) - gradeOrder.indexOf(g2); }
+
+// 1️⃣ Fetch the climb index (lightweight data only)
+async function loadIndex() {
+  listDiv.innerHTML = '';
+  const res = await fetch('/api/climbs/'); // your index.json endpoint
+  let climbs = await res.json(); // climbs is an array of objects like {id, name, grade, angle, tags?}
+if (!Array.isArray(climbs)) climbs = Object.values(climbs); // safety
+  const selectedMinG = minGSelect.value;
+  const selectedMaxG = maxGSelect.value;
+  const selectedAngle = angleSelect.value;
+
+  // 2️⃣ Filter based on dropdowns
+  climbs = climbs.filter(c => {
+    if (selectedMinG && c.grade < selectedMinG) return false;
+    if (selectedMaxG && c.grade > selectedMaxG) return false;
+    if (selectedAngle && Number(c.angle) !== Number(selectedAngle)) return false; // angle filter optional
+    return true;
+  });
+
+  // 3️⃣ Display the climbs in the list with tags if available
+  climbs.forEach(c => {
+    const div = document.createElement('div');
+    div.innerHTML = `<span>${c.name} | ${c.grade} | ${c.angle}</span>`;
+    const bottomSpan = document.createElement('span');
+bottomSpan.className = 'tags';
+const allTags = [];
+if(c.tags) allTags.push(...c.tags);
+if(c.features) allTags.push(...c.features);
+bottomSpan.textContent = allTags.join(', ');
+div.appendChild(bottomSpan);
+
+    // 4️⃣ Only load full climb JSON when clicked
+    div.addEventListener('click', () => showClimb(c.id));
+    listDiv.appendChild(div);
+  });
+}
+
+// 5️⃣ Fetch full climb JSON only on click
+async function showClimb(id) {
+  const res = await fetch('/api/climbs/' + id);
+  const climb = await res.json(); // full climb data with grid
+  gridDiv.innerHTML = '';
+
+  for (let r = 0; r < 16; r++) {
+    for (let c = 0; c < 18; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      if (climb.grid[r][c]) cell.style.background = climb.grid[r][c];
+      gridDiv.appendChild(cell);
+    }
+  }
+  const detailsDiv = document.getElementById('climbDetails');
+const details = [];
+if(climb.tags) details.push('Tags: ' + climb.tags.join(', '));
+if(climb.features) details.push('Features: ' + climb.features.join(', '));
+if(climb.feet) details.push('Feet: ' + climb.feet.join(', '));
+detailsDiv.textContent = details.join(' | ');
+}
+
+filterBtn.addEventListener('click', loadIndex);
+loadIndex();
+</script>
+</body>
+</html>

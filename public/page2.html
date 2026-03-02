@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Grid Editor</title>
+<style>
+#grid{display:grid;grid-template-columns:repeat(18,25px);gap:2px;margin-bottom:15px}
+.cell{width:25px;height:25px;background:#eee;cursor:pointer}
+.selector{padding:8px;margin:5px;border:none;cursor:pointer}
+.activeSel{outline:3px solid black}
+</style>
+</head>
+<body>
+<h2>Grid Editor</h2>
+<div id="grid"></div>
+<div>
+<button class="selector" data-color="green" style="background:green">Start</button>
+<button class="selector" data-color="blue" style="background:blue">Hand</button>
+<button class="selector" data-color="orange" style="background:orange">Foot</button>
+<button class="selector" data-color="red" style="background:red">End</button>
+
+</div>
+<br>
+<button onclick="save()">Save</button>
+
+<script>
+let climb=JSON.parse(sessionStorage.getItem('draft'));
+selected = 'green';
+document.querySelectorAll('.selector').forEach(b => {
+  b.classList.toggle('activeSel', b.dataset.color === 'green');
+});
+for(let r=0;r<16;r++){
+ for(let c=0;c<18;c++){
+  let d=document.createElement('div');
+  d.className='cell';
+d.onclick = () => {
+  if (!selected) return;
+
+  const colorCounts = { red: 0, green: 0 }; // track limits
+
+  // count current red and green in the grid
+  for (let row = 0; row < 16; row++) {
+    for (let col = 0; col < 18; col++) {
+      const val = climb.grid[row][col];
+      if (val === 'red') colorCounts.red++;
+      if (val === 'green') colorCounts.green++;
+    }
+  }
+
+  if (d.style.background === selected) {
+    // Clicking same color → reset
+    d.style.background = '#eee';
+    climb.grid[r][c] = null;
+    return;
+  }
+
+  // enforce limits
+  if ((selected === 'red' && colorCounts.red >= 1) ||
+      (selected === 'green' && colorCounts.green >= 2)) {
+    alert(`Max ${selected} cells reached`);
+    return;
+  }
+
+  // paint the cell
+  d.style.background = selected;
+  climb.grid[r][c] = selected;
+};
+  grid.appendChild(d);
+ }
+}
+
+document.querySelectorAll('.selector').forEach(b=>{
+ b.onclick=()=>{
+  document.querySelectorAll('.selector').forEach(x=>x.classList.remove('activeSel'));
+  b.classList.add('activeSel');
+  selected=b.dataset.color;
+ };
+});
+
+async function save(){
+ await fetch('/api/climbs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(climb)});
+ window.location='page3.html';
+}
+</script>
+</body>
+</html>
