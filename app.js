@@ -36,6 +36,7 @@ const HOLD_DURATION = 1000; // milliseconds
 
 let filledSequence = []; // for end-climb animation
 let reviewMode = false;  // true when showing end-climb replay
+let appActive = false;   // false until user logs in
 
 // Muted colors
 const LIMB_COLORS = {
@@ -51,6 +52,39 @@ const FILLED_COLORS = {
   leftFoot: "rgba(100,180,100,0.25)",
   rightFoot: "rgba(180,180,100,0.25)"
 };
+
+// ------------------ LOGIN FEATURE ------------------
+
+const loginBtn = document.getElementById("loginBtn");
+    const loginOverlay = document.getElementById("loginOverlay");
+    const topBar = document.querySelector('.top-controls');
+    const bottomBar = document.querySelector('.bottom-controls');
+
+    loginBtn.addEventListener("click", () => {
+      const name = document.getElementById("loginName").value.trim();
+      const password = document.getElementById("loginPassword").value.trim();
+
+      if (!name || !password) {
+        alert("Please enter name and password.");
+        return;
+      }
+
+      // Simple demo validation (replace with real auth later)
+      if (password === "1234") {
+        // Hide login overlay
+        loginOverlay.classList.add("hidden");
+
+        // Activate app
+        appActive = true;
+
+        // Show the top and bottom bars
+        if (topBar) topBar.style.display = 'flex';
+        if (bottomBar) bottomBar.style.display = 'flex';
+
+        // Start detection
+        startDetection();
+      }
+    });
 
 // ------------------ HAND SPEED TRACKING ------------------
 let speedHistory = {
@@ -309,6 +343,7 @@ function initAR(){
   });
 
   function updateCornersFromMarkers(){
+    if(!appActive) return;   // 🔒 block everything before login)
     if(!autoMode) return;
     Object.keys(markers).forEach(i=>{
       const m = markers[i];
@@ -340,7 +375,10 @@ pose.setOptions({ modelComplexity:1, smoothLandmarks:true, minDetectionConfidenc
 pose.onResults(onResults);
 
 const cameraMP = new Camera(videoElement,{ onFrame: async()=>{ await pose.send({image:videoElement}); }, width:camWidth, height:camHeight });
-cameraMP.start();
+
+function startDetection(){
+  cameraMP.start();
+}
 
 // ------------------ Hand Speed Rolling Average ------------------
 function computeLimbSpeeds() {
@@ -415,6 +453,7 @@ function updateLimbSpeedPanel() {
 function onResults(results){
   if(reviewMode) return; // skip detection view when replaying
   if(!cvReady) return;
+  if(!appActive) return;   // 🔒 block everything before login)
 
   ctx.save();
   ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -526,6 +565,7 @@ function onResults(results){
 }
 
 setInterval(()=>{
+  if(!appActive) return;   // 🔒 block everything before login)
   if(!characteristic || !latestBuffer) return;
   characteristic.writeValueWithoutResponse(latestBuffer);
 },50);
