@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Profile</title>
+<link rel="stylesheet" href="css/styles.css">
+
+<style>
+/* ========================
+   BACKGROUND
+======================== */
+html, body {
+  height: 100%;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: url("../images/page_bg.jpg") center center / cover no-repeat fixed;
+  font-family: appFont;
+  color: white;
+}
+
+/* ========================
+   DASHBOARD GRID
+======================== */
+.dashboard {
+  display: grid;
+  grid-template-columns: 1fr 50%; /* saved panel takes 40% of the dashboard width */
+  grid-template-rows: 1fr 1fr;
+  gap: 20px;
+  height: 70%;
+  
+  aspect-ratio: 1.25 / 1;
+}
+
+/* ========================
+   PANEL STYLE
+======================== */
+.panel {
+  background: rgba(15,15,15,0.65);
+  backdrop-filter: blur(20px);
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.6),
+              inset 0 0 10px rgba(255,255,255,0.05);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  text-transform: uppercase;
+  font-size: 14px;
+}
+
+/* ========================
+   PROFILE PICTURE PANEL
+======================== */
+#profilePicPanel {
+  justify-content: center;
+  align-items: center;
+}
+
+.profile-pic {
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  border: 2px solid rgba(0,150,255,0.6);
+  overflow: hidden;
+  background: rgba(255,255,255,0.08);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.profile-pic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ========================
+   STATS PANEL
+======================== */
+.stat {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.stat span:last-child {
+  font-weight: 600;
+}
+
+/* ========================
+   SAVED CLIMBS PANEL
+======================== */
+#savedPanel {
+  grid-row: 1 / span 2;
+  overflow-y: auto;
+}
+
+.savedClimbBtn {
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.08);
+  color: white;
+  padding: 6px 10px;
+  cursor: pointer;
+  text-transform: uppercase;
+  font-family: appFont;
+  transition: background 0.2s ease;
+}
+
+.savedClimbBtn:hover {
+  background: rgba(0,150,255,0.15);
+}
+
+/* ========================
+   BOTTOM BUTTON
+======================== */
+#goClimbBtn {
+  margin-top: 30px;
+  height: 42px;
+  border-radius: 999px;
+  border: 1px solid rgba(0,150,255,0.6);
+  background: rgba(0,150,255,0.15);
+  color: white;
+  font-family: appFont;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0 30px;
+}
+
+#goClimbBtn:hover {
+  background: rgba(0,150,255,0.3);
+}
+
+/* ========================
+   CIRCULAR HOLD DELETE
+======================== */
+.deleteBtn {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  border-radius: 50%;
+  color: white;
+  border: 1px solid rgba(255,0,0,0.2);
+  background: rgba(255,0,0,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  overflow: hidden;
+  padding: 0;
+}
+
+/* Radial fill effect */
+.deleteBtn .fill {
+  position: absolute;
+  width: 0%;
+  height: 0%;
+  background: rgba(255,0,0,0.2);
+  border-radius: 50%;
+  transition: width 1s linear, height 1s linear;
+}
+
+.deleteBtn span {
+  position: relative;
+  z-index: 2;
+  font-size: 14px;
+  pointer-events: none;
+}
+
+/* ========================
+   RESPONSIVE
+======================== */
+@media (max-width: 750px) {
+  .dashboard {
+    width: 80%;
+    height: auto;
+    display: flex;
+    flex-direction: column;
+    aspect-ratio: auto;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="dashboard">
+
+  <!-- Top Left: Profile Picture -->
+  <div class="panel" id="profilePicPanel" style="grid-column: 1; grid-row: 1;">
+    <div class="profile-pic">
+      <img src="images/profile.jpg" alt="Profile Picture">
+    </div>
+  </div>
+
+  <!-- Bottom Left: Stats -->
+  <div class="panel" style="grid-column: 1; grid-row: 2;">
+    <h3>Climber Stats</h3>
+
+    <div class="stat">
+      <span>Name</span>
+      <span>Alex</span>
+    </div>
+
+    <div class="stat">
+      <span>Total Climbs</span>
+      <span id="totalClimbs">0</span>
+    </div>
+
+    <div class="stat">
+      <span>Hardest Grade</span>
+      <span>7A</span>
+    </div>
+
+    <div class="stat">
+      <span>Total Attempts</span>
+      <span>24</span>
+    </div>
+  </div>
+
+  <!-- Right: Saved Attempts -->
+  <div class="panel" id="savedPanel" style="grid-column: 2; grid-row: 1 / span 2;">
+    <h3>Saved Attempts</h3>
+    <div id="savedAttempts" style="display:flex;flex-direction:column;gap:8px;"></div>
+  </div>
+
+</div>
+
+<button id="goClimbBtn">Go To Climb Selection</button>
+
+<script type="module" src="js/climb_attempts.js" defer></script>
+
+</body>
+</html>

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Pose Grid Tracker AR</title>
+
+  <!-- MediaPipe -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
+  <!-- OpenCV -->
+  <script src="https://docs.opencv.org/4.x/opencv.js"></script>
+
+  <!-- Three.js + AR.js -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/three.js/build/ar-threex.js"></script>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20,300,0,0&icon_names=bluetooth" />
+</head>
+
+<body>
+
+  <!-- VIDEO FOOTAGE AND CANVAS -->
+  <video class="input_video"></video>
+  <canvas class="output_canvas"></canvas>
+
+  <!-- TOP CONTROL BAR -->
+  <div class="top-controls controls">
+    <button id="connectBtn" onclick="connectBLE()">
+      <span class="material-symbols-rounded" style="margin-left:2px;">
+        bluetooth
+      </span>
+    </button>
+
+    <div id="climbName" style="font-size:16px; color:white; text-transform:uppercase;  margin-left: 10px; margin-right: 10px; letter-spacing: 1px;
+      text-transform: uppercase;"></div>
+  </div>
+
+  <!-- BOTTOM CONTROL BAR -->
+  <div class="bottom-controls controls">
+    <button id="resetBtn">RESET</button>
+    <button id="manualBtn" class="active">MANUAL</button>
+    <button id="autoBtn">AUTO</button>
+    <button id="endClimbBtn">END CLIMB</button>
+  </div>
+
+  <script>
+    /* BLE ACTIVE STATE */
+    function setBLEActive(isActive) {
+      const btn = document.getElementById("connectBtn");
+      if (isActive) {
+        btn.classList.add("active");
+      } else {
+        btn.classList.remove("active");
+      }
+    }
+
+    /* MODE SWITCHING */
+    const manualBtn = document.getElementById("manualBtn");
+    const autoBtn = document.getElementById("autoBtn");
+
+    manualBtn.addEventListener("click", () => {
+      manualBtn.classList.add("active");
+      autoBtn.classList.remove("active");
+    });
+
+    autoBtn.addEventListener("click", () => {
+      autoBtn.classList.add("active");
+      manualBtn.classList.remove("active");
+    });
+
+  </script>
+
+  <script type="module" src="js/app.js" defer></script>
+
+</body>
+</html>

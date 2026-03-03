@@ -1,0 +1,475 @@
+html {
+      height: 100%;
+      background: url("../images/page_bg.jpg") center center / cover no-repeat fixed;
+    }
+
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    body { 
+      margin:0; 
+      overflow:hidden; 
+      background-image: url("../images/page_bg.jpg");
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+    }
+    canvas {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    video { display:none; }
+
+    @font-face {
+      font-family: appFont;
+      src: url(../fonts/Montserrat-Regular.ttf);
+    }
+
+    /* =========================
+       TOP & BOTTOM CONTROL BARS
+       ========================= */
+    .top-controls {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: row;    /* horizontal by default */
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 8px 10px;
+      background: rgba(15,15,15,0.65);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow:
+        0 8px 30px rgba(0,0,0,0.6),
+        inset 0 0 10px rgba(255,255,255,0.05);
+      font-family: appFont;
+      font-size: 14px;
+      color: white;
+      z-index: 100;
+    }
+
+    .bottom-controls {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: row;
+      flex-wrap: nowrap;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 8px 10px;
+      background: rgba(15,15,15,0.65);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow:
+        0 8px 30px rgba(0,0,0,0.6),
+        inset 0 0 10px rgba(255,255,255,0.05);
+      font-family: appFont;
+      font-size: 14px;
+      color: white;
+      z-index: 100;
+      white-space: nowrap;
+      overflow-x: auto;
+    }
+
+    .top-controls,
+    .bottom-controls {
+      display: none;
+    }
+
+    /* =========================
+       BUTTONS
+       ========================= */
+    .controls button {
+      height: 36px;
+      padding: 0 16px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.08);
+      color: white;
+      cursor: pointer;
+      transition: background 0.2s ease, box-shadow 0.2s ease;
+      font-family: appFont;
+      font-size: 13px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .controls button:hover {
+      background: rgba(255,255,255,0.18);
+    }
+
+    #manualBtn.active {
+      background: rgba(0, 150, 255, 0.15);
+      border: 1px solid rgba(0, 150, 255, 0.6);
+      box-shadow:
+        0 0 12px rgba(0, 150, 255, 0.6),
+        inset 0 0 8px rgba(0, 150, 255, 0.4);
+    }
+
+    #autoBtn.active {
+      background: rgba(50, 200, 100, 0.15);
+      border: 1px solid rgba(50, 200, 100, 0.6);
+      box-shadow:
+        0 0 12px rgba(50, 200, 100, 0.6),
+        inset 0 0 8px rgba(50, 200, 100, 0.4);
+    }
+
+    #resetBtn {
+      border: 1px solid rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.08);
+      color: white;
+    }
+
+    #resetBtn:hover {
+      background: rgba(200,50,50,0.25);
+    }
+
+    #endClimbBtn {
+      border: 1px solid rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.08);
+      color: white;
+    }
+
+    #endClimbBtn:hover {
+      background: rgba(255,255,255,0.18);
+    }
+
+    #connectBtn {
+      padding: 0;
+      width: 36px; 
+      display: flex;           /* enable flexbox */
+      justify-content: center; /* horizontal centering */
+      align-items: center;     /* vertical centering */ 
+    }
+
+    /* =========================
+       GRID & SLIDER GROUPS
+       ========================= */
+    .input-group {
+      display: flex;
+      flex-direction: row;   /* horizontal by default */
+      align-items: center;
+      gap: 6px;
+    }
+
+    .label {
+      white-space: nowrap;
+    }
+
+    .stepper {
+      display: flex;
+      align-items: center;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 999px;
+      overflow: hidden;
+      height: 32px;
+    }
+
+    .stepper button {
+      width: 28px;
+      height: 100%;
+      border: none;
+      background: transparent;
+      color: white;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      line-height: 1;
+      transition: background 0.2s ease;
+    }
+
+    .stepper button:hover {
+      background: rgba(255,255,255,0.15);
+    }
+
+    .stepper input {
+      width: 45px;
+      text-align: center;
+      border: none;
+      background: transparent;
+      color: white;
+      font-family: appFont;
+      font-size: 13px;
+      outline: none;
+    }
+
+    .stepper input::-webkit-inner-spin-button,
+    .stepper input::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    .controls input[type="range"] {
+      accent-color: white;
+      cursor: pointer;
+    }
+
+    .slider-group #confVal {
+      width: 40px;
+      text-align: center;
+    }
+
+    /* Replay bar styling like detection bar */
+    #replayBar {
+      position: fixed;
+      width: auto;
+      bottom: 20px;
+      left: 50%;
+      transform: translate(-50%, 120%);
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      background: rgba(15,15,15,0.65);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.6), inset 0 0 10px rgba(255,255,255,0.05);
+      font-family: appFont;
+      font-size: 14px;
+      color: white;
+      z-index: 1000;
+      transition: transform 0.5s ease;
+    }
+
+    /* Slider inside replay bar */
+    #replaySlider {
+      width: 20vw;
+      margin-left: 12px;
+      accent-color: white;
+      cursor: pointer;
+    }
+
+    /* Reset button */
+    #replayResetBtn {
+      height: 36px;
+      width: auto;
+      padding: 0 16px;
+      margin-left: 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.08);
+      color: white;
+      cursor: pointer;
+      transition: background 0.2s ease, box-shadow 0.2s ease;
+      font-family: appFont;
+      font-size: 13px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    #replayResetBtn:hover {
+      background: rgba(200,50,50,0.25);
+    }
+
+    #currentMovePanel {
+      position: fixed;
+      top: 50%;                     /* vertically centered */
+      left: 20px;                   /* distance from left edge */
+      transform: translateY(-50%);  /* center vertically */
+      width: 12vw;
+      display: flex;
+      padding: 12px 16px;
+      background: rgba(15,15,15,0.65);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 12px;          /* slightly rounded rectangle */
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow:
+        0 8px 30px rgba(0,0,0,0.6),
+        inset 0 0 10px rgba(255,255,255,0.05);
+      font-family: appFont;
+      font-size: 14px;
+      color: white;
+      z-index: 1000;
+      transition: transform 0.5s ease, opacity 0.3s ease;
+      gap: 8px;                     /* space between move info */
+    }
+
+    #currentMovePanel div {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;      /* left-align each row */
+      font-size: 13px;
+      text-align: left;
+    }
+
+    #panelDurationBar {
+      height: 6px;
+      border-radius: 3px;
+    }
+
+    #replayPanel {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      
+      width: 72vh;      /* slightly larger than the grid */
+      height: 72vh;
+      
+      background: rgba(15,15,15,0.65);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      
+      border-radius: 16px;               /* match panel style */
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow:
+        0 8px 30px rgba(0,0,0,0.6),
+        inset 0 0 10px rgba(255,255,255,0.05);
+
+      z-index: 0;  /* behind canvas which is z-index:auto */
+      display: none; /* hidden by default */
+    }
+
+    /* =========================
+   LOGIN OVERLAY
+   ========================= */
+    #loginOverlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      z-index: 2000;
+      transition: opacity 0.4s ease;
+    }
+
+    /* =========================
+      LOGIN PANEL
+      ========================= */
+    #loginPanel {
+      width: 320px;
+      padding: 30px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+
+      background: rgba(15,15,15,0.65);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow:
+        0 8px 30px rgba(0,0,0,0.6),
+        inset 0 0 10px rgba(255,255,255,0.05);
+
+      font-family: appFont;
+      color: white;
+
+      transform: scale(1);
+      transition: transform 0.3s ease;
+    }
+
+    .login-title {
+      text-align: center;
+      font-size: 18px;
+      letter-spacing: 2px;
+      margin-bottom: 5px;
+    }
+
+    .login-input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 13px;
+    }
+
+    .login-input-group input {
+      height: 36px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.08);
+      color: white;
+      padding: 0 14px;
+      outline: none;
+      font-family: appFont;
+      transition: background 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .login-input-group input:focus {
+      background: rgba(255,255,255,0.18);
+      box-shadow: 0 0 10px rgba(0,150,255,0.4);
+    }
+
+    #loginBtn {
+      height: 40px;
+      margin-top: 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(0,150,255,0.6);
+      background: rgba(0,150,255,0.15);
+      color: white;
+      font-family: appFont;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    #loginBtn:hover {
+      background: rgba(0,150,255,0.3);
+      box-shadow:
+        0 0 12px rgba(0,150,255,0.6),
+        inset 0 0 8px rgba(0,150,255,0.4);
+    }
+
+    /* Hide animation */
+    #loginOverlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+
+    /* =========================
+       RESPONSIVE
+       ========================= */
+    @media screen and (max-width: 620px) {
+    .top-controls {
+      flex-direction: column !important;  /* force vertical stack */
+      align-items: center;
+      gap: 6px;
+      border-radius: 25px;
+      padding-top: 25px;
+      padding-bottom: 25px;
+    }
+
+    .top-controls .input-group {
+      flex-direction: column !important; /* label above input/slider */
+      align-items: center;
+    }
+
+    /* Add extra space below the connect button */
+    .top-controls #connectBtn {
+      margin-bottom: 12px;   /* adjust as needed */
+    }
+
+    /* Add extra space below the grid group */
+    .top-controls .grid-group {
+      margin-bottom: 16px;   /* adjust as needed */
+    }
+  }

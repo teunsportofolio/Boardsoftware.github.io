@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Create Climb</title>
+<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20,300,0,0&icon_names=arrow_back" />
+<style>
+/* ========================
+   BACKGROUND & FONT
+======================== */
+html, body {
+  height: 100%;
+  margin: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: url("../images/page_bg.jpg") center center / cover no-repeat fixed;
+  font-family: appFont;
+  color: white;
+}
+
+/* ========================
+   CONTAINER FOR PANELS
+======================== */
+.container {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+/* ========================
+   PANEL STYLING
+======================== */
+.panel {
+  background: rgba(15,15,15,0.65);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.6), inset 0 0 10px rgba(255,255,255,0.05);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  text-transform: uppercase;
+  font-size: 14px;
+  width: 90%;
+  max-width: 420px;
+}
+
+/* Headings */
+.panel h2, .panel h4 { margin: 0; font-family: appFont; }
+
+/* Input group for labels + selects */
+.input-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.input-group label {
+  width: 60px;
+  white-space: nowrap;
+  font-family: appFont;
+}
+
+/* Inputs */
+.panel input {
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.08);
+  color: white;
+  padding: 0 12px;
+  font-family: appFont;
+  text-transform: none;
+}
+
+.panel input::placeholder {
+  color: rgba(255,255,255,0.6);
+  text-transform: none;
+}
+
+/* ========================
+   CUSTOM SELECTS
+======================== */
+.custom-select {
+  position: relative;
+  width: 100px;
+  font-family: appFont;
+  user-select: none;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+
+.custom-select .selected {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 999px;
+  padding: 6px 12px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.custom-select .arrow {
+  width: 0; 
+  height: 0; 
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid white;
+}
+
+.custom-select ul {
+  position: absolute;
+  top: 42px;
+  left: 0;
+  right: 0;
+  background: rgba(15,15,15,0.85);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  list-style: none;
+  padding: 4px 0;
+  margin: 0;
+  display: none;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 100;
+}
+
+.custom-select ul li {
+  padding: 6px 12px;
+  text-transform: uppercase;
+  font-family: appFont;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.custom-select ul li:hover {
+  background: rgba(0,150,255,0.15);
+}
+
+/* ========================
+   TOGGLE BUTTONS
+======================== */
+.toggle {
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.08);
+  color: white;
+  cursor: pointer;
+  padding: 6px 10px;
+  margin: 3px;
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+  font-family: appFont;
+}
+
+.toggle.active {
+  background: rgba(0,150,255,0.15);
+  border: 1px solid rgba(0,150,255,0.6);
+}
+
+/* ========================
+   NEXT / CREATE BUTTON
+======================== */
+#nextBtn {
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid rgba(0,150,255,0.6);
+  background: rgba(0,150,255,0.15);
+  color: white;
+  font-family: appFont;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+#nextBtn:hover {
+  background: rgba(0,150,255,0.3);
+}
+
+/* ========================
+   SAVED CLIMBS PANEL
+======================== */
+#savedPanel {
+  width: 220px;
+  min-width: 200px;
+  font-size: 13px;
+}
+
+.savedClimbBtn {
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.08);
+  color: white;
+  padding: 6px 10px;
+  cursor: pointer;
+  text-transform: uppercase;
+  font-family: appFont;
+  margin: 3px 0;
+  transition: background 0.2s ease;
+}
+
+.savedClimbBtn:hover {
+  background: rgba(255,255,255,0.12);
+}
+
+/* ========================
+   CIRCULAR HOLD DELETE
+======================== */
+.deleteBtn {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  border-radius: 50%;
+  color: white;
+  border: 1px solid rgba(255,0,0,0.2);
+  background: rgba(255,0,0,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  overflow: hidden;
+  padding: 0;
+}
+
+/* Radial fill effect */
+.deleteBtn .fill {
+  position: absolute;
+  width: 0%;
+  height: 0%;
+  background: rgba(255,0,0,0.2);
+  border-radius: 50%;
+  transition: width 1s linear, height 1s linear;
+}
+
+.deleteBtn span {
+  position: relative;
+  z-index: 2;
+  font-size: 14px;
+  pointer-events: none;
+}
+
+/* ========================
+   VERTICAL LEFT FLOATING RETURN BUTTON
+======================== */
+#returnBtn {
+  position: fixed;
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.08);
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  transition: all 0.25s ease, transform 0.25s ease;
+  box-shadow: 2px 2px 12px rgba(0,0,0,0.5), inset 0 0 6px rgba(255,255,255,0.05);
+  font-family: appFont;
+}
+
+#returnBtn:hover {
+  background: rgba(255,255,255,0.15);
+  transform: translate(-4px, -50%);
+}
+
+/* ========================
+   RESPONSIVE
+======================== */
+@media (max-width: 620px) {
+  .container {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .panel {
+    width: 95%;
+    padding: 16px;
+  }
+
+  .input-group {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .input-group label {
+    width: auto;
+  }
+
+  .custom-select {
+    width: 100%;
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- LEFT PANEL: Create/Edit Climb -->
+  <div class="panel" id="createPanel">
+    <h2>Create / Edit Climb</h2>
+    <input id="name" placeholder="Climb Name">
+
+    <div class="input-group">
+      <label for="grade">Grade</label>
+      <div class="custom-select" id="gradeSelect"></div>
+
+      <label for="angle">Angle</label>
+      <div class="custom-select" id="angleSelect"></div>
+
+      <label for="rows">Rows</label>
+      <div class="custom-select" id="rowsSelect"></div>
+
+      <label for="cols">Cols</label>
+      <div class="custom-select" id="colsSelect"></div>
+    </div>
+
+    <h4>Tags</h4>
+    <div id="tags"></div>
+
+    <h4>Special Rules</h4>
+    <div id="features"></div>
+
+    <h4>Allowed Starting Feet</h4>
+    <div id="feet"></div>
+
+    <button id="nextBtn">Create Climb</button>
+  </div>
+
+  <!-- RIGHT PANEL: Saved Climbs -->
+  <div class="panel" id="savedPanel">
+    <h4>Saved Climbs</h4>
+    <div id="savedClimbs" style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto;">
+      <!-- saved climbs populate here -->
+    </div>
+  </div>
+</div>
+
+<button id="returnBtn">
+  <span class="material-symbols-rounded">
+    arrow_back
+  </span>
+</button>
+
+<script type="module" src="js/climbs.js" defer></script>
+</body>
+</html>
