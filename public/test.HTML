@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Climb Visualizer</title>
+
+  <style>
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(18, 32px);
+      gap: 4px;
+      margin-top: 20px;
+    }
+
+    .cell {
+      width: 32px;
+      height: 32px;
+      background: #ddd;
+      border: 1px solid #aaa;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+
+    .cell.hold {
+      border: 2px solid black;
+    }
+
+    .cell:hover {
+      transform: scale(1.15);
+    }
+
+    .highlight-clicked {
+      outline: 3px solid yellow;
+    }
+
+    .highlight-previous {
+      outline: 3px solid purple;
+    }
+
+    .highlight-harder {
+      outline: 3px solid red;
+    }
+
+    .highlight-easier {
+      outline: 3px solid blue;
+    }
+  </style>
+</head>
+
+<body>
+
+<h2>Climb Visualizer</h2>
+
+<label>Climb ID</label>
+<input id="climbId" value="e0832af8-c409-4c1c-a065-70db322703d4">
+
+<button onclick="loadClimb()">Load Climb</button>
+
+<div id="grid"></div>
+
+<h3 id="result"></h3>
+<h3 id="neighbors"></h3>
+
+<script>
+let currentClimb = null;
+let holdLevels = null;
+
+async function loadClimb() {
+  const climbId = document.getElementById("climbId").value;
+
+  const res = await fetch(`/api/climbs/${climbId}`);
+  currentClimb = await res.json();
+
+  const hd = await fetch("/api/holddifficulty");
+  const hdJson = await hd.json();
+
+  holdLevels = hdJson["Hold difficulty level"];
+
+  const grid = document.getElementById("grid");
+  grid.innerHTML = "";
+
+  currentClimb.grid.forEach((row, r) => {
+    row.forEach((cell, c) => {
+      const div = document.createElement("div");
+      div.classList.add("cell");
+
+      if (cell !== null) {
+        div.classList.add("hold");
+        div.style.background = cell;
+      }
+
+      div.style.opacity = (holdLevels[r][c] !== -1 && holdLevels[r][c] !== null) ? 1 : 0.3;
+
+      div.dataset.row = r;
+      div.dataset.col = c;
+
+      div.onclick = () => handleClick(r, c);
+
+      grid.appendChild(div);
+    });
+  });
+}
+
+async function handleClick(row, col) {
+  clearHighlights();
+
+  const climbId = document.getElementById("climbId").value;
+
+  const clickedCell = getCell(row, col);
+  clickedCell.classList.add("highlight-clicked");
+
+  // MAIN difficulty from server
+  const main = await getDifficulty(climbId, row, col);
+
+  if (main.error) {
+    document.getElementById("result").innerText = "Error: " + main.error;
+    return;
+  }
+
+  document.getElementById("result").innerText =
+    `Clicked difficulty: ${main.difficulty}`;
+
+  const oldHold = main.oldHold;
+
+  if (oldHold) {
+    getCell(oldHold.row, oldHold.col).classList.add("highlight-previous");
+  }
+
+  const offsets = [
+    [-1,-1], [-1,0], [-1,1],
+    [ 0,-1],         [ 0,1],
+    [ 1,-1], [ 1,0], [ 1,1]
+  ];
+
+  const neighborResults = [];
+
+  for (const [dr, dc] of offsets) {
+    const nr = row + dr;
+    const nc = col + dc;
+
+    if (!holdLevels[nr] || holdLevels[nr][nc] === undefined)
+      continue;
+
+    // Ask server for neighbor difficulty using SAME oldHold
+    const res = await getDifficulty(climbId, nr, nc, oldHold);
+
+    if (!res.error && res.difficulty !== null) {
+      neighborResults.push({
+        row: nr,
+        col: nc,
+        difficulty: res.difficulty
+      });
+    }
+  }
+
+  if (neighborResults.length === 0) {
+    document.getElementById("neighbors").innerText =
+      "No valid surrounding holds.";
+    return;
+  }
+
+  const harder = neighborResults
+    .filter(n => n.difficulty > main.difficulty)
+    .sort((a,b) => a.difficulty - b.difficulty)[0];
+
+  const easier = neighborResults
+    .filter(n => n.difficulty < main.difficulty)
+    .sort((a,b) => b.difficulty - a.difficulty)[0];
+
+  if (harder) {
+    getCell(harder.row, harder.col).classList.add("highlight-harder");
+  }
+
+  if (easier) {
+    getCell(easier.row, easier.col).classList.add("highlight-easier");
+  }
+
+  document.getElementById("neighbors").innerText =
+    `Closest harder: ${harder ? harder.difficulty : "none"}  
+     Closest easier: ${easier ? easier.difficulty : "none"}`;
+}
+
+function getCell(r, c) {
+  return document.querySelector(`.cell[data-row="${r}"][data-col="${c}"]`);
+}
+
+function clearHighlights() {
+  document.querySelectorAll(
+    ".highlight-harder, .highlight-easier, .highlight-clicked, .highlight-previous"
+  ).forEach(el => el.classList.remove(
+    "highlight-harder",
+    "highlight-easier",
+    "highlight-clicked",
+    "highlight-previous"
+  ));
+}
+
+async function getDifficulty(climbId, row, col, oldHold = null) {
+  const response = await fetch("/api/difficulty", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      climbId,
+      newHold: { row, col },
+      oldHold
+    })
+  });
+
+  return response.json();
+}
+</script>
+
+
+
+</body>
+</html>
