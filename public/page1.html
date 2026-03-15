@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Create Climb</title>
+<style>
+.toggle{margin:5px;padding:6px;background:#ddd;cursor:pointer}
+.toggle.active{background:#4caf50;color:white}
+</style>
+</head>
+<body>
+<h2>Create / Edit Climb</h2>
+<input id="name" placeholder="Name"><br><br>
+<select id="grade"></select>
+<select id="angle"></select>
+<h4>Tags</h4>
+<div id="tags"></div>
+<h4>Special Rules</h4>
+<div id="features"></div>
+<h4>Allowed Starting Feet</h4>
+<div id="feet"></div>
+
+<br>
+<button onclick="next()">Next ➜</button>
+
+<script>
+
+    
+const grades=['3','4','5A','5B','5C','6A','6B','6C','7A','7B','7C','8A'];
+grades.forEach(g=>{let o=document.createElement('option');o.text=g;grade.add(o);});
+for(let i=20;i<=60;i+=5){let o=document.createElement('option');o.text=i;angle.add(o);} 
+
+function toggles(container,items){
+ items.forEach(i=>{
+  let b=document.createElement('button');
+  b.textContent=i;
+  b.className='toggle';
+  b.onclick=()=>b.classList.toggle('active');
+  container.appendChild(b);
+ });
+}
+
+function togglesStandardActive(container,items){
+ items.forEach(i=>{
+  let b=document.createElement('button');
+  b.textContent=i;
+  b.className='toggle active';
+  b.onclick=()=>b.classList.toggle('active');
+  container.appendChild(b);
+ });
+}
+toggles (tags,['Crimpy','Slopers','Jugs','Compression','Dyno','Morpho','Old School'])
+toggles(features,['Campus only','No Matching','Crimp']);
+togglesStandardActive(feet,['Black Pancakes','Big Black Feet','White Disks']);
+
+function next(){
+  const nameInput = document.getElementById('name'); 
+  const climbName = nameInput.value.trim();
+  if (!climbName) { alert("Please enter a name"); return; }
+
+  const climb = {
+    name: climbName,
+    grade: document.getElementById('grade').value,
+    angle: document.getElementById('angle').value,
+    features: [...document.getElementById('features').querySelectorAll('.active')].map(b=>b.textContent),
+    feet: [...document.getElementById('feet').querySelectorAll('.active')].map(b=>b.textContent),
+    tags: [...document.getElementById('tags').querySelectorAll('.active')].map(b=>b.textContent),
+    grid: Array(16).fill().map(()=>Array(18).fill(null))
+  };
+
+  sessionStorage.setItem('draft', JSON.stringify(climb));
+  window.location='page2.html';
+}
+</script>
+</body>
+</html>
