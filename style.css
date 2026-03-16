@@ -1,0 +1,681 @@
+/* --- DESIGN SYSTEM: Colors & Fonts --- */
+* {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none; /* Prevents the long-press menu on images/links */
+}
+
+:root {
+    --mainColor: #F9F4E8;
+    /* Gold/Accent */
+    --accentColor: #E6BC73;
+    --bgColor: #34302d;
+
+    /* Board specific colors for detection circles */
+    --boardStartColor: #4CAF50;
+    --boardHoldColor: #2196F3;
+    --boardEndColor: #F44336;
+    --boardFootColor: #FFEB3B;
+
+    /* Safe Areas for Mobile */
+    --safe-top: env(safe-area-inset-top);
+    --safe-bottom: env(safe-area-inset-bottom);
+}
+
+/* Fonts */
+@font-face {
+    font-family: 'mainFont';
+    /*a name to be used later*/
+    src: url(fonts/Montserrat-Regular.ttf);
+}
+
+@font-face {
+    font-family: 'mainFontBold';
+    /*a name to be used later*/
+    src: url(fonts/Montserrat-SemiBold.ttf);
+}
+
+.headerFont {
+    font-family: mainFontBold;
+    letter-spacing: 3px;
+    font-size: 14px;
+    margin-left: 10px;
+    color: var(--bgColor);
+}
+
+.textFont {
+    font-family: mainFont;
+    font-weight: 400;
+    font-size: 16px;
+}
+
+.subFont {
+    font-family: mainFont;
+    font-weight: 600;
+    font-size: 10px;
+    color: #888;
+}
+
+.iconFont {
+    font-family: mainFontBold;
+    font-size: 8px;
+}
+
+/* Base Reset */
+body,
+html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-image: url("../images/bg.png");
+    background-position: center; /* Center the image */
+    background-repeat: no-repeat; /* Do not repeat the image */
+    background-size: cover; /* Resize the background image to cover the entire container */
+}
+
+/* --- MAIN NAVIGATION --- */
+.topBar {
+    position: absolute;
+    top: var(--safe-top);
+    margin-top: 25px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80%;
+    height: 54px;
+    background: var(--mainColor);
+    /* Fixed Case-Sensitivity */
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 15px;
+    z-index: 100;
+    pointer-events: auto;
+    /* Makes buttons clickable again */
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    font-family: mainFontBold;
+}
+
+.topBarGroup {
+    display: flex;
+    align-items: center;
+    gap: 8px; /* Space between dropdown and bluetooth button */
+}
+
+.bottomBar {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    height: calc(80px + var(--safe-bottom));
+    background: var(--mainColor);
+    /* Fixed Case-Sensitivity */
+    display: flex;
+    justify-content: center;
+    gap: 9vw;
+    align-items: center;
+    padding-bottom: var(--safe-bottom);
+    z-index: 1000;
+    pointer-events: auto;
+    /* Makes buttons clickable again */
+}
+
+.nav-item {
+    background: transparent;
+    border: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 0;
+    cursor: pointer;
+    pointer-events: auto;
+    width: 54px;
+}
+
+/* --- INPUT TYPES --- */
+
+.btn {
+    border-radius: 999px;
+    border: none;
+    cursor: pointer;
+    background: var(--accentColor);
+    /* Changed to Accent for visibility */
+    transition: transform 0.1s;
+    pointer-events: auto;
+    height: 38px;
+    cursor: pointer;
+    touch-action: manipulation; /* Prevents zooming on double-tap */
+}
+
+.mainActionButton {
+    width: 85px;
+    height: 85px;
+    position: relative;
+    background: transparent;
+    border: 6px solid white !important;
+    align-self: center;
+    flex-shrink: 0; /* Prevents it from squishing */
+}
+
+.inputField {
+    border-radius: 10px;
+    border: 1px solid #ccc;
+    padding: 10px;
+}
+
+.dropDownContainer {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.dropDown {
+    appearance: none;
+    -webkit-appearance: none;
+    background: var(--accentColor);
+    color: white;
+    border: none;
+    border-radius: 999px;
+    padding: 6px 45px 6px 15px; /* Extra right padding for the divider + arrow */
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+    line-height: 1.2;
+}
+
+/* --- SPECIFIC COMPONENTS --- */
+
+/* Dividers */
+.bigDivider {
+    height: 2px;
+    width: 100%;
+    background: #eee;
+    margin: 10px 0;
+}
+
+.smallDivider {
+    height: 1px;
+    width: 80%;
+    background: #eee;
+    margin: 5px auto;
+}
+
+/* --- ICON SYSTEM --- */
+.material-symbols-rounded {
+    font-family: 'Material Symbols Rounded';
+    font-weight: normal;
+    font-style: normal;
+    font-size: 28px;
+    display: inline-block;
+    line-height: 1;           /* Removes extra vertical space */
+    width: 1em;               /* Force square bounding box */
+    height: 1em;              /* Force square bounding box */
+    text-align: center;
+    text-transform: none;
+    letter-spacing: normal;
+    word-wrap: normal;
+    white-space: nowrap;
+    direction: ltr;
+    font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+}
+
+.dropDownIcon {
+    position: absolute;
+    right: 8px;
+    color: white;
+    font-size: 20px !important;
+    pointer-events: none; /* Allows the tap to "click through" to the select menu */
+}
+
+.bluetoothIcon {
+    color: var(--mainColor);
+    height: 32px;
+    width: 32px;
+}
+
+.loadingIcon {
+    font-size: 100px !important;
+    color: var(--accentColor);
+    animation: spin 2s linear infinite;
+    margin-bottom: 20px;
+}
+
+/* The Vertical Line Divider */
+.dropDownIcon::before {
+    content: "";
+    position: absolute;
+    left: -7px; /* Positions the line between number and arrow */
+    top: -30%;
+    height: 160%;
+    width: 3px;
+    background-color: var(--mainColor);
+}
+
+/* Extra Icon centering logic */
+
+.btn, .bluetoothIcon, .mainActionButton, .nav-item, .sub-btn {
+    display: flex;            /* Enables Flexbox */
+    align-items: center;      /* Vertical centering */
+    justify-content: center;   /* Horizontal centering */
+    padding: 0;               /* Remove default browser padding */
+    overflow: hidden;         /* Ensures nothing leaks out */
+}
+
+
+.bluetoothIcon .material-symbols-rounded {
+    font-size: 18px;
+    color: var(--mainColor);
+    position: relative;
+    right: -0.5px;
+}
+
+.profileIcon .material-symbols-rounded,
+.detectionIcon .material-symbols-rounded,
+.climbsIcon .material-symbols-rounded {
+    color: var(--bgColor);
+    font-size: 32px;
+    /* Icons are black on the cream bar */
+}
+
+.sub-btn .material-symbols-rounded{
+    color: white;
+}
+
+.material-symbols-rounded .navBtnActive{
+    color: var(--mainColor);
+}
+
+#modeToggleBtn .material-symbols-rounded, #resetBtn .material-symbols-rounded {
+    font-size: 42px;
+    color: var(--mainColor);
+    font-weight: 300;
+}
+
+
+/* --- DETECTION STUFF --- */
+
+#webcam-video {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100dvh;
+    object-fit: cover;
+    z-index: 1;
+    background-color: black;
+}
+
+#detection-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100dvh;
+    object-fit: cover;
+    pointer-events: auto; /* Required to drag corners! */
+    z-index: 5;
+    background: transparent !important; /* Critical: video must show through */
+}
+
+#app-viewport {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100dvh;
+    z-index: 1000; /* Highest layer (Buttons) */
+    pointer-events: none; /* Let clicks pass through to the canvas */
+}
+
+
+
+/* The Sub-Bar for Reset/Auto/Manual */
+.detection-sub-bar {
+    position: absolute;
+    bottom: 110px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%; 
+    display: flex;
+    justify-content: center;
+    /* 1. Align children to the bottom of the flex container */
+    align-items: flex-end; 
+    gap: 20px; 
+    z-index: 101;
+    padding: 10px 20px;
+    pointer-events: auto;
+}
+
+/* Normal state (Manual) */
+#modeToggleBtn {
+    transition: all 0.3s ease;
+}
+
+/* Active state (Auto) */
+.active-mode {
+    background: var(--accentColor) !important; /* Green or your Brand color */
+}
+
+.sub-btn {
+    background: transparent;
+    border: none;
+    color: white;
+    padding: 8px 8px;
+    border-radius: 99px;
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 1px;
+}
+
+
+
+#resetBtn {
+    transition: all .2s ease-in-out;
+}
+
+#resetBtn:active {
+    background-color: #E6BC73;
+    transition: .1s;
+}
+
+
+/* --- UNIVERSAL MODAL SYSTEM --- */
+
+.modal-overlay {
+    position: fixed;
+    top: 0; 
+    left: 0; 
+    width: 100%; 
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6); /* Slightly softer overlay */
+    display: flex; 
+    align-items: center; 
+    justify-content: center;
+    z-index: 3000; /* Above everything else */
+    backdrop-filter: blur(5px);
+    transition: opacity 0.3s ease;
+}
+
+.modal-content {
+    background: var(--mainColor); /* Cream background to match TopBar */
+    border-radius: 30px;
+    padding: 25px;
+    width: 70%;
+    max-width: 360px;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    border: 1px solid rgba(0,0,0,0.05);
+    animation: modalPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.modal-title {
+    font-family: 'mainFontBold';
+    color: var(--bgColor);
+    letter-spacing: 1px;
+    font-size: 18px;
+    margin-bottom: 10px;
+}
+
+.modal-text {
+    font-family: 'mainFont';
+    color: #666;
+    font-size: 13px;
+    line-height: 1.4;
+    margin-bottom: 20px;
+}
+
+/* Reusing your input style logic */
+.modal-input {
+    width: 100%;
+    box-sizing: border-box;
+    background: white;
+    border: 2px solid #eee;
+    padding: 14px;
+    border-radius: 15px;
+    font-family: 'mainFont';
+    font-size: 16px;
+    color: var(--bgColor);
+    margin-bottom: 20px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.modal-input:focus {
+    border-color: var(--accentColor);
+}
+
+/* Action Buttons */
+.modal-actions {
+    display: flex;
+    gap: 12px;
+}
+
+/* Universal Modal Button Styles */
+.modal-btn {
+    flex: 1;
+    height: 50px;
+    border-radius: 999px;
+    border: none;
+    font-family: 'mainFontBold';
+    font-size: 12px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.2s, transform 0.1s;
+}
+
+.modal-btn:active {
+    transform: scale(0.96);
+}
+
+.modal-btn.primary {
+    background: var(--accentColor);
+    color: white;
+}
+
+.modal-btn.secondary {
+    background: #eee;
+    color: #888;
+}
+
+.hidden { 
+    display: none !important; 
+}
+
+
+
+/* --- Loading Screen --- */
+
+#loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100dvh;
+    background: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    /* Slide it behind the bars (100+) but above the camera (1-5) */
+    z-index: 50; 
+    transition: opacity 0.8s ease-out, visibility 0.8s;
+    pointer-events: none; /* Allows user to click buttons while loading */
+}
+
+.loader-content {
+    text-align: center;
+    color: var(--bgColor);
+}
+
+/* Class to hide the loader */
+#loading-overlay.hidden {
+    opacity: 0;
+    visibility: hidden;
+}
+
+/* --- Animations --- */
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@keyframes modalPop {
+    from {
+        opacity: 0;
+        transform: scale(0.8) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+/* --- Active Elements --- */
+
+.navBtnActive {
+    width: 54px;
+    height: 54px;
+    position: relative;
+    color: var(--mainColor) !important;
+    background-color: var(--accentColor);
+    border-radius: 999px;
+}
+
+/* --- PROFILE DASHBOARD STYLES --- */
+.dashboard-scroll-area {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow-y: auto; /* Enables scrolling for the cards */
+    padding-top: 110px; /* Space for topBar */
+    padding-bottom: 120px; /* Space for bottomBar */
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* Centers the 80% width panels */
+    z-index: 500;
+    pointer-events: auto; /* Allows clicking and scrolling */
+    box-sizing: border-box;
+    -webkit-overflow-scrolling: touch; /* Smooth scroll for iOS */
+}
+
+/* 2. PANEL STYLING */
+.profile-card {
+    background: var(--mainColor);
+    border-radius: 28px;
+    padding: 22px;
+    margin-bottom: 20px;
+    width: 85%; /* Matches topBar width */
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    box-sizing: border-box;
+    pointer-events: auto;
+}
+
+/* 3. PERSONAL STATS SECTION */
+.stats-grid {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.stat-box {
+    background: white;
+    padding: 15px 10px;
+    border-radius: 20px;
+    text-align: center;
+    flex: 1;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+}
+
+.stat-value {
+    display: block;
+    font-family: 'mainFontBold', sans-serif;
+    font-size: 22px;
+    color: var(--accentColor);
+}
+
+.stat-label {
+    display: block;
+    font-family: 'subFont', sans-serif;
+    font-size: 10px;
+    color: #888;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-top: 4px;
+}
+
+/* 4. SAVED CLIMB ITEMS */
+.climb-item {
+    background: white;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    padding: 14px 18px;
+    gap: 12px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: transform 0.1s ease;
+    border: 1px solid rgba(0,0,0,0.03);
+}
+
+.climb-info {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.climb-name {
+    font-family: 'mainFontBold', sans-serif;
+    font-size: 14px;
+    color: var(--bgColor);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.climb-meta {
+    font-family: 'mainFont', sans-serif;
+    font-size: 11px;
+    color: #999;
+    margin-top: 2px;
+}
+
+/* 5. HOLD-TO-DELETE SYSTEM */
+.delete-btn-container {
+    position: relative;
+    width: 38px;
+    height: 38px;
+    background: #f2f2f2;
+    border-radius: 50%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    touch-action: none; /* Prevents scrolling while holding */
+}
+
+.delete-fill {
+    position: absolute;
+    background: var(--boardEndColor);
+    width: 0%;
+    height: 0%;
+    border-radius: 50%;
+    transition: width 1s linear, height 1s linear;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.delete-btn-container .material-symbols-rounded {
+    position: relative;
+    z-index: 2;
+    font-size: 18px !important;
+    color: #bbb;
+    pointer-events: none;
+}

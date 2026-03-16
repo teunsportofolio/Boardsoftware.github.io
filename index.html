@@ -1,49 +1,101 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Pose Grid Tracker</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Climbing AI</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://docs.opencv.org/4.x/opencv.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/three.js/build/ar-threex.js"></script>
 
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-  <script src="https://docs.opencv.org/4.x/opencv.js"></script>
-
-  <style>
-    body { margin: 0; overflow: hidden; background: black; }
-    canvas { position: absolute; }
-    video { display: none; }
-
-    .controls {
-      position: fixed;
-      top: 10px;
-      left: 10px;
-      background: rgba(0,0,0,0.6);
-      color: white;
-      padding: 10px;
-      border-radius: 8px;
-      font-family: sans-serif;
-    }
-  </style>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,300,0,0" />
 </head>
 <body>
-  <video class="input_video"></video>
-  <canvas class="output_canvas"></canvas>
+    <video id="webcam-video" class="input_video" autoplay playsinline muted></video>
+    
+    <canvas id="detection-canvas" class="output_canvas"></canvas>
 
-  <div class="controls">
-    Grid Size:
-    <input type="number" id="gridSize" value="12" min="2" max="30"><br>
-    Confidence:
-    <input type="range" id="confidence" min="0" max="1" step="0.05" value="0.5">
-    <span id="confVal">0.5</span>
-    IP:
-    <input id="espIP" value="192.168.1.50">
-    <button onclick="connectESP32(document.getElementById('espIP').value)">
-    Connect
-    </button>
+    <div id="loading-overlay">
+        <div class="loader-content">
+            <span class="material-symbols-rounded loadingIcon">sync</span>
+            <h2 class="headerFont">INITIALIZING CAMERA</h2>
+            <p class="subFont" id="loading-status">Loading OpenCV & Pose Models...</p>
+        </div>
+    </div>
 
-  </div>
+    <div id="app-viewport">
+        
+        <header class="topBar">
+            <span class="headerFont" id="climbName">DETECTION</span>
+            
+            <div class="topBarGroup">
+                <div class="dropDownContainer">
+                    <select id="gridSize" class="dropDown textFont">
+                        <option value="30">30</option>
+                        <option value="35">35</option>
+                        <option value="40">40</option>
+                        <option value="45">45</option>
+                        <option value="50" selected>50</option>
+                        <option value="55">55</option>
+                        <option value="60">60</option>
+                    </select>
+                    <span class="material-symbols-rounded dropDownIcon">expand_more</span>
+                </div>
 
-    <script src="app.js"></script>
+                <button class="btn bluetoothIcon" onclick="connectBLE()">
+                    <span class="material-symbols-rounded">bluetooth</span>
+                </button>
+            </div>
+        </header>
 
+        <div class="detection-sub-bar">
+            <button id="resetBtn" class="sub-btn">
+                <span class="material-symbols-rounded" style="color:white;">reset_exposure</span>
+            </button>
+            <button id="startBtn" class="btn mainActionButton">
+            </button>
+            <button id="modeToggleBtn" class="sub-btn">
+                <span class="material-symbols-rounded" style="color:white;">my_location</span>
+            </button>
+        </div>
+
+        <nav class="bottomBar">
+            <button class="nav-item climbsIcon" onclick="location.href = 'climbs.html'">
+                <span class="material-symbols-rounded">cards_star</span>
+            </button>
+
+            <button class="nav-item navBtnActive detectionIcon" onclick="location.href = 'index.html'">
+                <span class="material-symbols-rounded" style="color:var(--mainColor);">photo_camera</span>
+            </button>
+
+            <button class="nav-item profileIcon" onclick="location.href = 'profile.html'">
+                <span class="material-symbols-rounded">account_circle</span>
+            </button>
+        </nav>
+    </div>
+
+    <div id="saveModal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-title">CLIMB COMPLETE</div>
+            <div id="modalStats" class="modal-text">
+                </div>
+            
+            <input type="text" id="climbNameInput" class="modal-input" placeholder="Name your climb...">
+            
+            <div class="modal-actions">
+                <button type="button" id="cancelSave" class="modal-btn secondary">DISCARD</button>
+                <button type="button" id="confirmSave" class="modal-btn primary">SAVE & REPLAY</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="main.js"></script>
+    <script src="detection.js"></script>
 </body>
 </html>
-

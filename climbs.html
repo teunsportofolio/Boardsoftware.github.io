@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Climbing AI</title>
+
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,300,0,0" />
+</head>
+<body>
+    <div id="app-viewport">
+        
+        <header class="topBar">
+            <span class="headerFont" id="climbName">CLIMBS</span>
+            
+            <div class="topBarGroup">
+                <div class="dropDownContainer">
+                    <select id="gridSize" class="dropDown textFont">
+                        <option value="30">30</option>
+                        <option value="35">35</option>
+                        <option value="40">40</option>
+                        <option value="45">45</option>
+                        <option value="50" selected>50</option>
+                        <option value="55">55</option>
+                        <option value="60">60</option>
+                    </select>
+                    <span class="material-symbols-rounded dropDownIcon">expand_more</span>
+                </div>
+
+                <button class="btn bluetoothIcon" onclick="connectBLE()">
+                    <span class="material-symbols-rounded">bluetooth</span>
+                </button>
+            </div>
+        </header>
+
+        <nav class="bottomBar">
+            <button class="nav-item climbsIcon navBtnActive" onclick="location.href = 'climbs.html'">
+                <span class="material-symbols-rounded" style="color:var(--mainColor);">cards_star</span>
+            </button>
+
+            <button class="nav-item detectionIcon" onclick="location.href = 'index.html'">
+                <span class="material-symbols-rounded">photo_camera</span>
+            </button>
+
+            <button class="nav-item profileIcon" onclick="location.href = 'profile.html'">
+                <span class="material-symbols-rounded">account_circle</span>
+            </button>
+        </nav>
+    </div>
+
+    <script src="main.js"></script>
+</body>
+</html>
