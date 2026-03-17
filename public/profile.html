@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Climbing AI</title>
+
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,300,0,0" />
+</head>
+<body>
+    <div id="app-viewport">
+        <header class="topBar">
+            <span class="headerFont">PROFILE</span>
+            <div class="topBarGroup">
+                <button class="btn bluetoothIcon" onclick="connectBLE()">
+                    <span class="material-symbols-rounded">settings</span>
+                </button>
+            </div>
+        </header>
+
+        <div class="dashboard-scroll-area">
+            
+            <div class="profile-card">
+                <div style="display:flex; align-items:center; gap:15px;">
+                    <div style="width:50px; height:50px; background:var(--accentColor); border-radius:50%; display:flex; align-items:center; justify-content:center; color:white;">
+                        <span class="material-symbols-rounded">person</span>
+                    </div>
+                    <div class="climb-info">
+                        <div class="headerFont" style="font-size:16px; margin-left:0;">GUEST CLIMBER</div>
+                        <div class="subFont">Session Athlete</div>
+                    </div>
+                </div>
+                
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <span class="stat-value" id="totalClimbs" style="font-family: 'mainFontBold'; color: var(--accentColor); font-size: 20px;">0</span>
+                        <span class="stat-label" style="font-family: 'mainFont'; font-size: 10px; display:block;">CLIMBS</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-value" style="font-family: 'mainFontBold'; color: var(--accentColor); font-size: 20px;">--</span>
+                        <span class="stat-label" style="font-family: 'mainFont'; font-size: 10px; display:block;">AVG HOLD</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="profile-card">
+                <h3 class="headerFont" style="margin:0 0 15px 0; font-size: 14px;">SAVED ATTEMPTS</h3>
+                <div id="savedAttempts"></div>
+            </div>
+        </div>
+
+        <nav class="bottomBar">
+            <button class="nav-item climbsIcon" onclick="location.href = 'climbs.html'">
+                <span class="material-symbols-rounded">cards_star</span>
+            </button>
+
+            <button class="nav-item detectionIcon" onclick="location.href = 'index.html'">
+                <span class="material-symbols-rounded">photo_camera</span>
+            </button>
+
+            <button class="nav-item profileIcon navBtnActive" onclick="location.href = 'profile.html'">
+                <span class="material-symbols-rounded" style="color:var(--mainColor);">account_circle</span>
+            </button>
+        </nav>
+    </div>
+
+    <script src="main.js"></script>
+    <script type="module" src="climb_attempts.js" defer></script>
+</body>
+</html>

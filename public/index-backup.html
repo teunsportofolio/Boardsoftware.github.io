@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Climbing AI</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" />
+</head>
+<body>
+
+    <video id="webcam-video" autoplay playsinline muted></video>
+
+    <div id="app-viewport">
+        
+        <header class="topBar">
+            <span class="headerFont">DETECTION</span>
+            
+            <div class="topBarGroup">
+                <div class="dropDownContainer">
+                    <select class="dropDown textFont">
+                        <option value="30">30</option>
+                        <option value="35">35</option>
+                        <option value="40">40</option>
+                        <option value="45">45</option>
+                        <option value="50" selected>50</option>
+                        <option value="55">55</option>
+                        <option value="60">60</option>
+                    </select>
+                    <span class="material-symbols-rounded dropDownIcon">expand_more</span>
+                </div>
+
+                <button class="btn bluetoothIcon">
+                    <span class="material-symbols-rounded">bluetooth</span>
+                </button>
+            </div>
+        </header>
+
+        <nav class="bottomBar">
+            <button class="nav-item climbsIcon">
+                <span class="material-symbols-rounded">cards_star</span>
+                <span class="iconFont">CLIMBS</span>
+            </button>
+
+            <button class="btn mainActionButton">
+                <span class="material-symbols-rounded">photo_camera</span>
+            </button>
+
+            <button class="nav-item profileIcon">
+                <span class="material-symbols-rounded">account_circle</span>
+                <span class="iconFont">PROFILES</span>
+            </button>
+        </nav>
+    </div>
+
+    <script src="main.js"></script>
+</body>
+</html>
