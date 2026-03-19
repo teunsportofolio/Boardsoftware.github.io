@@ -118,7 +118,7 @@ const confValDisplay = document.getElementById("confVal");
 
 // Setup Canvas Size
 canvas.width = camWidth;
-canvas.height = camHeight;
+canvas.height = camHeight;`
 canvas.style.width = "100vw";
 canvas.style.height = "auto";
 
@@ -416,67 +416,60 @@ const hoverScales = new Array(corners.length).fill(0);
 let dragging = null;
 let hoverIndex = null;
 
-
+// NEW: last predicted difficulty from behavior model (set elsewhere in your app)
+let lastPredictedDifficulty = null; 
 
 function drawPlannedRoute(Hinv) {
-    if (!activeRoute || !activeRoute.grid || !Hinv) return;
+  if (!activeRoute || !activeRoute.grid || !Hinv) return;
 
-    for (let r = 0; r < GRID_ROWS; r++) {
-        if (!activeRoute.grid[r]) continue;
-        
-        for (let c = 0; c < GRID_COLS; c++) {
-            const plannedColor = activeRoute.grid[r][c];
-            if (!plannedColor) continue;
+  for (let r = 0; r < GRID_ROWS; r++) {
+    if (!activeRoute.grid[r]) continue;
 
-            const key = `${r},${c}`;
-            const isTouched = LIMB_KEYS.some(limb => filledCells[limb] && filledCells[limb][key]);
-            const isTwinHold = (plannedColor === "#00FFFF"); // Use the new Cyan
+    for (let c = 0; c < GRID_COLS; c++) {
+      const plannedColor = activeRoute.grid[r][c];
+      if (!plannedColor) continue;
 
-            // 1. Calculate Warp Points
-            const p1 = warpPoint(Hinv, c / GRID_COLS, r / GRID_ROWS);
-            const p2 = warpPoint(Hinv, (c + 1) / GRID_COLS, r / GRID_ROWS);
-            const p3 = warpPoint(Hinv, (c + 1) / GRID_COLS, (r + 1) / GRID_ROWS);
-            const p4 = warpPoint(Hinv, c / GRID_COLS, (r + 1) / GRID_ROWS);
+      const key = `${r},${c}`;
+      const isTouched = LIMB_KEYS.some(limb => filledCells[limb] && filledCells[limb][key]);
+      const isTwinHold = (plannedColor === "#00FFFF");
 
-            ctx.save();
+      const p1 = warpPoint(Hinv, c / GRID_COLS, r / GRID_ROWS);
+      const p2 = warpPoint(Hinv, (c + 1) / GRID_COLS, r / GRID_ROWS);
+      const p3 = warpPoint(Hinv, (c + 1) / GRID_COLS, (r + 1) / GRID_ROWS);
+      const p4 = warpPoint(Hinv, c / GRID_COLS, (r + 1) / GRID_ROWS);
 
-            // 2. Set Visual State
-            if (isTouched) {
-                ctx.fillStyle = "white";
-                ctx.shadowBlur = 0;
-            } else if (isTwinHold) {
-                // Pulse effect for the AI suggestion
-                const pulse = (Math.sin(Date.now() / 200) + 1) / 2; // Slightly faster pulse
-                
-                ctx.fillStyle = "#00FFFF";
-                ctx.shadowColor = "#00FFFF";
-                ctx.shadowBlur = 15 + (25 * pulse); // Intense outer glow
-                
-                // Add a white inner core to make it look "powered on"
-                ctx.strokeStyle = `rgba(255, 255, 255, ${0.5 + (0.5 * pulse)})`;
-                ctx.lineWidth = 4;
-            } else {
-                ctx.fillStyle = plannedColor;
-                ctx.shadowBlur = 0;
-            }
+      ctx.save();
 
-            // 3. Draw the Hold Path
-            ctx.beginPath();
-            ctx.moveTo(p1.x, p1.y);
-            ctx.lineTo(p2.x, p2.y);
-            ctx.lineTo(p3.x, p3.y);
-            ctx.lineTo(p4.x, p4.y);
-            ctx.closePath();
-            ctx.fill();
-            
-            // 4. Draw Border (Subtle white stroke for definition)
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
-            ctx.lineWidth = isTwinHold ? 3 : 1; 
-            ctx.stroke();
+      if (isTouched) {
+        ctx.fillStyle = "white";
+        ctx.shadowBlur = 0;
+      } else if (isTwinHold) {
+        const pulse = (Math.sin(Date.now() / 200) + 1) / 2;
+        ctx.fillStyle = "#00FFFF";
+        ctx.shadowColor = "#00FFFF";
+        ctx.shadowBlur = 15 + (25 * pulse);
+        ctx.strokeStyle = `rgba(255, 255, 255, ${0.5 + (0.5 * pulse)})`;
+        ctx.lineWidth = 4;
+      } else {
+        ctx.fillStyle = plannedColor;
+        ctx.shadowBlur = 0;
+      }
 
-            ctx.restore();
-        }
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.lineTo(p3.x, p3.y);
+      ctx.lineTo(p4.x, p4.y);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+      ctx.lineWidth = isTwinHold ? 3 : 1;
+      ctx.stroke();
+
+      ctx.restore();
     }
+  }
 }
 
 
@@ -596,12 +589,10 @@ function updateLimbSpeedPanel() {
 async function markFilledCell(limb, row, col, duration) {
   const key = `${row},${col}`;
   const now = performance.now();
-  
-  // 1. Check if the hold exists in the Route Creator's plan
+
   const routeHoldLevel = (activeRoute && activeRoute.grid[row]) ? activeRoute.grid[row][col] : null;
 
   if (!filledCells[limb][key]) {
-    // 2. NEW MOVE DETECTED
     const moveEntry = {
       sequence: ++moveCounter,
       limb,
@@ -609,32 +600,44 @@ async function markFilledCell(limb, row, col, duration) {
       col,
       timestamp: now,
       duration,
-      onRoute: routeHoldLevel !== null, 
+      onRoute: routeHoldLevel !== null,
       prescribedLevel: routeHoldLevel,
-      difficultyScore: 0 // Will be updated by server
+      difficultyScore: 0
     };
 
     filledCells[limb][key] = { duration, notified: false };
     filledSequence.push(moveEntry);
 
   } else {
-    // 3. UPDATING EXISTING HOLD DURATION
     const move = filledSequence.find(m => m.limb === limb && m.row === row && m.col === col);
     if (move) {
       move.duration = Math.max(move.duration, duration);
       filledCells[limb][key].duration = move.duration;
 
-      // 4. TRIGGER DIFFICULTY CALCULATION (Once move is "Solid")
       if (move.duration >= HOLD_DURATION && !filledCells[limb][key].notified) {
-        filledCells[limb][key].notified = true; // Only ask the server once
-        
-        // Find the previous move for this limb to calculate distance/effort
+        filledCells[limb][key].notified = true;
+
         const prevMove = filledSequence.filter(m => m.limb === limb).slice(-2)[0];
-        
+
         if (prevMove && activeRoute) {
           const stats = await getMoveDifficulty(prevMove, move);
           move.difficultyScore = stats.difficulty;
           console.log(`Move #${move.sequence} Difficulty: ${stats.difficulty.toFixed(1)}`);
+
+          // NEW: ask server to generate next hold using prediction + hold difficulty
+          if (lastPredictedDifficulty != null) {
+            try {
+              const gen = await requestGeneratedNextHold(prevMove, move, lastPredictedDifficulty);
+              if (gen && gen.chosenHold) {
+                const gh = gen.chosenHold;
+                if (activeRoute.grid[gh.row]) {
+                  activeRoute.grid[gh.row][gh.col] = "#00FFFF";
+                }
+              }
+            } catch (e) {
+              console.warn("Generate-next-hold failed", e);
+            }
+          }
         }
       }
     }
@@ -642,18 +645,46 @@ async function markFilledCell(limb, row, col, duration) {
   updateStatsUI();
 }
 
-// Helper to talk to your Node.js API
+// Helper to talk to hold-based difficulty API
 async function getMoveDifficulty(oldHold, newHold) {
-    const res = await fetch('/api/difficulty', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            climbId: activeRoute.id,
-            newHold: { row: newHold.row, col: newHold.col },
-            oldHold: { row: oldHold.row, col: oldHold.col }
-        })
-    });
-    return res.json();
+  const res = await fetch('/api/difficulty', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      climbId: activeRoute.id,
+      newHold: { row: newHold.row, col: newHold.col },
+      oldHold: { row: oldHold.row, col: oldHold.col }
+    })
+  });
+  return res.json();
+}
+
+// NEW: helper to ask server for generated next hold
+async function requestGeneratedNextHold(prevMove, move, predictedDifficulty) {
+  const res = await fetch('/api/generate-next-hold', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      climbId: activeRoute.id,
+      currentHold: { row: move.row, col: move.col },
+      previousHold: { row: prevMove.row, col: prevMove.col },
+      predictedDifficulty
+    })
+  });
+  if (!res.ok) throw new Error('generate-next-hold failed');
+  return res.json();
+}
+
+// OPTIONAL: helper to call behavior difficulty API somewhere else in your app
+async function getBehaviorDifficulty(meta) {
+  const res = await fetch('/api/behavior-difficulty', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ meta })
+  });
+  const data = await res.json();
+  lastPredictedDifficulty = data.difficulty;
+  return data;
 }
 
 function onResults(results) {
