@@ -89,6 +89,210 @@ function moveDifficulty(oldHold, newHold) {
   return dist + holdScore + (dirScore + bonus);
 }
 
+
+
+// -----------------------------
+// ADAPTIVE HOLD SELECTION LOGIC
+// -----------------------------
+
+const MAX_REACH = 6; // ~90cm (6 * 15cm)
+const MAX_UP = 4;    // limit vertical jump
+
+function getCandidateHolds(currentHold, route) {
+    const candidates = [];
+
+    for (let r = 0; r < route.grid.length; r++) {
+        for (let c = 0; c < route.grid[r].length; c++) {
+
+            if (route.grid[r][c] === null) continue;
+
+            const dx = c - currentHold.col;
+            const dy = r - currentHold.row;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            // ✅ IMPROVED FILTER (prevents weird moves)
+            if (
+                r <= currentHold.row &&                  // upward
+                r >= currentHold.row - MAX_UP &&         // limit vertical jump
+                dist > 0 &&
+                dist <= MAX_REACH
+            ) {
+                candidates.push({ row: r, col: c, dist });
+            }
+        }
+    }
+
+    return candidates;
+}
+
+function evaluateCandidates(prevHold, candidates) {
+    return candidates
+        .map(c => {
+            const diff = moveDifficulty(prevHold, c);
+            if (diff === null) return null;
+
+            return {
+                ...c,
+                difficulty: diff
+            };
+        })
+        .filter(Boolean);
+}
+
+function pickAdaptiveHold(candidates, lastMoveDifficulty) {
+    if (!candidates.length) return null;
+
+    const TARGET = 5.5;
+
+    // Sort by difficulty (ascending)
+    candidates.sort((a, b) => a.difficulty - b.difficulty);
+
+    let chosen;
+
+    if (lastMoveDifficulty < TARGET - 1) {
+        // Too easy → pick harder hold
+        chosen = candidates[Math.floor(candidates.length * 0.75)];
+    } else if (lastMoveDifficulty > TARGET + 1) {
+        // Too hard → pick easier hold
+        chosen = candidates[Math.floor(candidates.length * 0.25)];
+    } else {
+        // Good → pick middle
+        chosen = candidates[Math.floor(candidates.length * 0.5)];
+    }
+
+    return chosen;
+}
+
+/* -----------------------------
+   API: ADAPTIVE NEXT HOLD
+----------------------------- */
+app.post('/api/adaptive-next-hold', async (req, res) => {
+    try {
+        const { climbId, currentHold, previousHold, lastMoveDifficulty } = req.body;
+
+        // Load route (same logic as your other endpoints)
+        let file = path.join(routesDir, `${climbId}.json`);
+        if (!fs.existsSync(file)) {
+            file = path.join(climbsDir, `${climbId}.json`);
+        }
+
+        if (!fs.existsSync(file)) {
+            return res.status(404).json({ error: 'Route not found' });
+        }
+
+        const route = await fs.readJson(file);
+
+        // 1. Find all reachable holds
+        const candidates = getCandidateHolds(currentHold, route);
+
+        // 2. Compute difficulty for each
+        const evaluated = evaluateCandidates(previousHold, candidates);
+
+        if (!evaluated.length) {
+            return res.status(400).json({ error: 'No valid candidates' });
+        }
+
+        // 3. Pick adaptive hold
+        const chosen = pickAdaptiveHold(evaluated, lastMoveDifficulty);
+
+        res.json({
+            chosenHold: chosen,
+            allCandidates: evaluated.sort((a, b) => a.difficulty - b.difficulty)
+        });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).send("Adaptive selection failed");
+    }
+});
+
+/* -----------------------------
+   API: BEHAVIOR DIFFICULTY
+----------------------------- */
+app.post('/api/difficulty', (req, res) => {
+    const { meta } = req.body;
+
+    const positions = meta?.positions || [];
+    const duration = (meta?.duration || 0) / 1000; // sec
+    const dt = (meta?.dt || 500) / 1000;
+
+    // --- FEATURES ---
+    const adjustment = computeAdjustment(positions);
+    const timeToStable = computeTimeToStable(positions, dt);
+    const smoothness = computeSmoothness(positions);
+    const hesitation = Math.max(0, duration - timeToStable);
+
+    // --- NORMALIZATION ---
+    const normStable = clamp(timeToStable / 1.5, 0, 1);
+    const normAdjust = clamp(adjustment / 50, 0, 1);
+    const normHesitation = clamp(hesitation / 2, 0, 1);
+    const normSmooth = 1 - clamp(smoothness / 20, 0, 1);
+
+    // --- FINAL SCORE (0–10) ---
+    let difficulty =
+        0.35 * normStable +
+        0.30 * normAdjust +
+        0.20 * normHesitation +
+        0.15 * normSmooth;
+
+    difficulty = clamp(difficulty * 10, 0, 10);
+
+    res.json({
+        difficulty
+    });
+});
+
+function clamp(v, min, max) {
+    return Math.max(min, Math.min(max, v));
+}
+
+function computeAdjustment(positions) {
+    let total = 0;
+
+    for (let i = 1; i < positions.length; i++) {
+        const dx = positions[i].x - positions[i - 1].x;
+        const dy = positions[i].y - positions[i - 1].y;
+        total += Math.hypot(dx, dy);
+    }
+
+    return total;
+}
+
+function computeTimeToStable(positions, dt) {
+    if (positions.length < 5) return dt;
+
+    for (let i = 3; i < positions.length; i++) {
+        let movement = 0;
+
+        for (let j = i - 3; j < i; j++) {
+            const dx = positions[j].x - positions[j - 1].x;
+            const dy = positions[j].y - positions[j - 1].y;
+            movement += Math.hypot(dx, dy);
+        }
+
+        if (movement < 5) {
+            return (i / positions.length) * dt;
+        }
+    }
+
+    return dt;
+}
+
+function computeSmoothness(positions) {
+    let total = 0;
+
+    for (let i = 2; i < positions.length; i++) {
+        const dx1 = positions[i - 1].x - positions[i - 2].x;
+        const dy1 = positions[i - 1].y - positions[i - 2].y;
+
+        const dx2 = positions[i].x - positions[i - 1].x;
+        const dy2 = positions[i].y - positions[i - 1].y;
+
+        total += Math.hypot(dx2 - dx1, dy2 - dy1);
+    }
+
+    return total;
+}
 /* -----------------------------
    API: ROUTES (The Setter)
 ----------------------------- */
