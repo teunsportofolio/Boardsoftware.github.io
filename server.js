@@ -4,7 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '10mb' })); // Give the skeletons room to breathe
 app.use(express.static('public'));
 
 /* -----------------------------
@@ -12,21 +12,19 @@ app.use(express.static('public'));
 ----------------------------- */
 const dataDir = path.join(__dirname, 'data');
 const climbsDir = path.join(dataDir, 'climbs');
-const routesDir = path.join(dataDir, 'routes');
-const generatedDir = path.join(dataDir, 'generated'); // NEW: generated holds
-const climbsIndexFile = path.join(dataDir, 'index.json');
-const routesIndexFile = path.join(dataDir, 'routes_index.json');
+const routesDir = path.join(dataDir, 'routes'); // NEW: Dedicated routes folder
+const climbsIndexFile = path.join(dataDir, 'index.json'); // Attempts index
+const routesIndexFile = path.join(dataDir, 'routes_index.json'); // NEW: Routes index
 const holdDifficultyFile = path.join(dataDir, 'holddifficulty.json');
 
 // Ensure all folders and index files exist
 fs.ensureDirSync(climbsDir);
 fs.ensureDirSync(routesDir);
-fs.ensureDirSync(generatedDir);
 if (!fs.existsSync(climbsIndexFile)) fs.writeJsonSync(climbsIndexFile, []);
 if (!fs.existsSync(routesIndexFile)) fs.writeJsonSync(routesIndexFile, []);
 
 /* -----------------------------
-   LOAD HOLD DIFFICULTY
+   LOAD HOLD DIFFICULTY (Your Math Data)
 ----------------------------- */
 const holdData = fs.readJsonSync(holdDifficultyFile);
 const holdLevels = holdData["Hold difficulty level"];
@@ -35,7 +33,7 @@ const holdWeights = Object.fromEntries(holdData["Hold difficulty weight"]);
 const directionWeights = Object.fromEntries(holdData["Hold direction difficulty weight"]);
 
 /* -----------------------------
-   CLIMBING PHYSICS
+   CLIMBING PHYSICS (Your Original Logic)
 ----------------------------- */
 function distance(a, b) {
   const dx = a.col - b.col;
@@ -78,16 +76,13 @@ function findPreviousHold(route, newHold) {
 }
 
 function moveDifficulty(oldHold, newHold) {
-  const level = holdLevels[newHold.row]?.[newHold.col];
-  const direction = holdDirections[newHold.row]?.[newHold.col];
-  if (level === -1 || level == null || direction === -1 || direction == null) return null;
-
+  const level = holdLevels[newHold.row][newHold.col];
+  const direction = holdDirections[newHold.row][newHold.col];
+  if (level === -1 || direction === -1) return null;
   const dist = distance(oldHold, newHold);
   const holdScore = holdWeights[level];
   const dirScore = directionWeights[direction];
-  const oldDir = holdDirections[oldHold.row]?.[oldHold.col];
-  if (oldDir == null) return null;
-
+  const oldDir = holdDirections[oldHold.row][oldHold.col];
   let bonus = 0;
   if (oldHold.col < newHold.col) bonus = bonusLeft(oldDir, direction);
   if (oldHold.col > newHold.col) bonus = bonusRight(oldDir, direction);
@@ -95,177 +90,7 @@ function moveDifficulty(oldHold, newHold) {
 }
 
 /* -----------------------------
-   ADAPTIVE HOLD SELECTION LOGIC
------------------------------ */
-
-const MAX_REACH = 6;
-const MAX_UP = 4;
-
-function getCandidateHolds(currentHold, route) {
-  const candidates = [];
-
-  for (let r = 0; r < route.grid.length; r++) {
-    for (let c = 0; c < route.grid[r].length; c++) {
-      if (route.grid[r][c] === null) continue;
-
-      const dx = c - currentHold.col;
-      const dy = r - currentHold.row;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-
-      if (
-        r <= currentHold.row &&
-        r >= currentHold.row - MAX_UP &&
-        dist > 0 &&
-        dist <= MAX_REACH
-      ) {
-        candidates.push({ row: r, col: c, dist });
-      }
-    }
-  }
-
-  return candidates;
-}
-
-function evaluateCandidates(prevHold, candidates) {
-  return candidates
-    .map(c => {
-      const diff = moveDifficulty(prevHold, c);
-      if (diff === null) return null;
-      return { ...c, difficulty: diff };
-    })
-    .filter(Boolean);
-}
-
-function pickAdaptiveHold(candidates, lastMoveDifficulty) {
-  if (!candidates.length) return null;
-
-  const TARGET = 5.5;
-  candidates.sort((a, b) => a.difficulty - b.difficulty);
-
-  let chosen;
-  if (lastMoveDifficulty < TARGET - 1) {
-    chosen = candidates[Math.floor(candidates.length * 0.75)];
-  } else if (lastMoveDifficulty > TARGET + 1) {
-    chosen = candidates[Math.floor(candidates.length * 0.25)];
-  } else {
-    chosen = candidates[Math.floor(candidates.length * 0.5)];
-  }
-
-  return chosen;
-}
-
-/* -----------------------------
-   API: ADAPTIVE NEXT HOLD
------------------------------ */
-app.post('/api/adaptive-next-hold', async (req, res) => {
-  try {
-    const { climbId, currentHold, previousHold, lastMoveDifficulty } = req.body;
-
-    let file = path.join(routesDir, `${climbId}.json`);
-    if (!fs.existsSync(file)) {
-      file = path.join(climbsDir, `${climbId}.json`);
-    }
-    if (!fs.existsSync(file)) {
-      return res.status(404).json({ error: 'Route not found' });
-    }
-
-    const route = await fs.readJson(file);
-    const candidates = getCandidateHolds(currentHold, route);
-    const evaluated = evaluateCandidates(previousHold, candidates);
-
-    if (!evaluated.length) {
-      return res.status(400).json({ error: 'No valid candidates' });
-    }
-
-    const chosen = pickAdaptiveHold(evaluated, lastMoveDifficulty);
-
-    res.json({
-      chosenHold: chosen,
-      allCandidates: evaluated.sort((a, b) => a.difficulty - b.difficulty)
-    });
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Adaptive selection failed");
-  }
-});
-
-/* -----------------------------
-   API: BEHAVIOR DIFFICULTY (RENAMED)
------------------------------ */
-app.post('/api/behavior-difficulty', (req, res) => {
-  const { meta } = req.body;
-
-  const positions = meta?.positions || [];
-  const duration = (meta?.duration || 0) / 1000;
-  const dt = (meta?.dt || 500) / 1000;
-
-  const adjustment = computeAdjustment(positions);
-  const timeToStable = computeTimeToStable(positions, dt);
-  const smoothness = computeSmoothness(positions);
-  const hesitation = Math.max(0, duration - timeToStable);
-
-  const normStable = clamp(timeToStable / 1.5, 0, 1);
-  const normAdjust = clamp(adjustment / 50, 0, 1);
-  const normHesitation = clamp(hesitation / 2, 0, 1);
-  const normSmooth = 1 - clamp(smoothness / 20, 0, 1);
-
-  let difficulty =
-    0.35 * normStable +
-    0.30 * normAdjust +
-    0.20 * normHesitation +
-    0.15 * normSmooth;
-
-  difficulty = clamp(difficulty * 10, 0, 10);
-
-  res.json({ difficulty });
-});
-
-function clamp(v, min, max) {
-  return Math.max(min, Math.min(max, v));
-}
-
-function computeAdjustment(positions) {
-  let total = 0;
-  for (let i = 1; i < positions.length; i++) {
-    const dx = positions[i].x - positions[i - 1].x;
-    const dy = positions[i].y - positions[i - 1].y;
-    total += Math.hypot(dx, dy);
-  }
-  return total;
-}
-
-function computeTimeToStable(positions, dt) {
-  if (positions.length < 5) return dt;
-
-  for (let i = 3; i < positions.length; i++) {
-    let movement = 0;
-    for (let j = i - 3; j < i; j++) {
-      const dx = positions[j].x - positions[j - 1].x;
-      const dy = positions[j].y - positions[j - 1].y;
-      movement += Math.hypot(dx, dy);
-    }
-    if (movement < 5) {
-      return (i / positions.length) * dt;
-    }
-  }
-  return dt;
-}
-
-function computeSmoothness(positions) {
-  let total = 0;
-  for (let i = 2; i < positions.length; i++) {
-    const dx1 = positions[i - 1].x - positions[i - 2].x;
-    const dy1 = positions[i - 1].y - positions[i - 2].y;
-    const dx2 = positions[i].x - positions[i - 1].x;
-    const dy2 = positions[i].y - positions[i - 1].y;
-    total += Math.hypot(dx2 - dx1, dy2 - dy1);
-  }
-  return total;
-}
-
-/* -----------------------------
-   API: ROUTES
+   API: ROUTES (The Setter)
 ----------------------------- */
 app.post('/api/routes', async (req, res) => {
   try {
@@ -299,8 +124,10 @@ app.get('/api/routes/:id', async (req, res) => {
 app.delete('/api/routes/:id', async (req, res) => {
   try {
     const id = req.params.id;
+    // 1. Delete the route file
     await fs.remove(path.join(routesDir, `${id}.json`));
 
+    // 2. Update the routes index
     let index = await fs.readJson(routesIndexFile);
     index = index.filter(i => i.id !== id);
     await fs.writeJson(routesIndexFile, index, { spaces: 2 });
@@ -311,21 +138,25 @@ app.delete('/api/routes/:id', async (req, res) => {
   }
 });
 
+
 /* -----------------------------
-   API: CLIMBS
+   API: CLIMBS (The Attempts)
 ----------------------------- */
 app.post('/api/climbs', async (req, res) => {
   try {
     const id = uuidv4();
     const climb = { ...req.body, id };
 
+    // --- SUCCESS CHECK LOGIC ---
     let completed = false;
-
+    
+    // 1. Get the original route to find the 'End' hold
     if (climb.routeId) {
       const routeFile = path.join(routesDir, `${climb.routeId}.json`);
       if (fs.existsSync(routeFile)) {
         const route = await fs.readJson(routeFile);
-
+        
+        // 2. Find the Red (#F44336) hold in the original route grid
         let endHold = null;
         route.grid.forEach((row, r) => {
           row.forEach((cell, c) => {
@@ -333,32 +164,35 @@ app.post('/api/climbs', async (req, res) => {
           });
         });
 
-        const lastMove = climb.filledSequence?.[climb.filledSequence.length - 1];
-        if (endHold && lastMove &&
-            lastMove.row === endHold.row &&
+        // 3. Check if the user's last move matches that hold
+        const lastMove = climb.filledSequence[climb.filledSequence.length - 1];
+        if (endHold && lastMove && 
+            lastMove.row === endHold.row && 
             lastMove.col === endHold.col) {
           completed = true;
         }
       }
     }
 
+    // Attach the result to the climb object
     climb.completed = completed;
     await fs.writeJson(path.join(climbsDir, `${id}.json`), climb, { spaces: 2 });
 
-    const moveCount = (climb.filledSequence && Array.isArray(climb.filledSequence))
-      ? climb.filledSequence.length : 0;
+    // Update the index with the 'completed' flag
+    const moveCount = (climb.filledSequence && Array.isArray(climb.filledSequence)) 
+                      ? climb.filledSequence.length : 0;
 
     let index = await fs.readJson(climbsIndexFile);
     index.push({
       id,
-      routeId: climb.routeId,
+      routeId: climb.routeId, // Crucial for Twin generation later
       name: climb.name || "Unnamed Attempt",
       routeName: climb.routeName || "N/A",
       timestamp: climb.timestamp || Date.now(),
-      moveCount,
-      completed
+      moveCount: moveCount,
+      completed: completed // Now saved in index for fast UI loading
     });
-
+    
     await fs.writeJson(climbsIndexFile, index, { spaces: 2 });
     res.json({ id });
   } catch (err) {
@@ -386,10 +220,12 @@ app.delete('/api/climbs/:id', async (req, res) => {
     const id = req.params.id;
     const file = path.join(climbsDir, `${id}.json`);
 
+    // 1. Remove the detail file
     if (fs.existsSync(file)) {
       await fs.remove(file);
     }
 
+    // 2. Remove from the index
     let index = await fs.readJson(climbsIndexFile);
     index = index.filter(i => i.id !== id);
     await fs.writeJson(climbsIndexFile, index, { spaces: 2 });
@@ -402,198 +238,150 @@ app.delete('/api/climbs/:id', async (req, res) => {
 });
 
 /* -----------------------------
-   API: HOLD-BASED DIFFICULTY
+   API: DIFFICULTY (The Logic)
 ----------------------------- */
 app.post('/api/difficulty', async (req, res) => {
   const { climbId, newHold, oldHold: clientOldHold } = req.body;
-  const level = holdLevels[newHold.row]?.[newHold.col];
-  if (level === -1 || level == null) return res.status(400).json({ error: 'Invalid hold' });
+  const level = holdLevels[newHold.row][newHold.col];
+  if (level === -1 || level === null) return res.status(400).json({ error: 'Invalid hold' });
 
+  // Search in both folders to be safe
   let file = path.join(climbsDir, `${climbId}.json`);
   if (!fs.existsSync(file)) file = path.join(routesDir, `${climbId}.json`);
-
+  
   if (!fs.existsSync(file)) return res.status(404).json({ error: 'Source not found' });
 
   const route = await fs.readJson(file);
   let oldHold = clientOldHold || findPreviousHold(route, newHold);
   if (!oldHold) return res.status(400).json({ error: 'Previous hold not found' });
 
-  const diff = moveDifficulty(oldHold, newHold);
-  if (diff == null) return res.status(400).json({ error: 'Difficulty could not be computed' });
-
-  res.json({ oldHold, newHold, difficulty: diff });
+  res.json({ oldHold, newHold, difficulty: moveDifficulty(oldHold, newHold) });
 });
 
 app.get('/api/holddifficulty', (req, res) => res.json(holdData));
 
-/* -----------------------------
-   API: GENERATED NEXT HOLD
------------------------------ */
-app.post('/api/generate-next-hold', async (req, res) => {
-  try {
-    const { climbId, currentHold, previousHold, predictedDifficulty } = req.body;
+app.listen(3000, () => console.log('Server running on http://localhost:3000'));
 
-    let file = path.join(routesDir, `${climbId}.json`);
-    if (!fs.existsSync(file)) {
-      file = path.join(climbsDir, `${climbId}.json`);
-    }
-    if (!fs.existsSync(file)) {
-      return res.status(404).json({ error: 'Route not found' });
-    }
 
-    const route = await fs.readJson(file);
 
-    const candidates = getCandidateHolds(currentHold, route);
-    const evaluated = evaluateCandidates(previousHold, candidates);
-    if (!evaluated.length) {
-      return res.status(400).json({ error: 'No valid candidates' });
-    }
-
-    const prevDiff = moveDifficulty(previousHold, currentHold);
-    if (prevDiff == null) {
-      return res.status(400).json({ error: 'Previous move difficulty unavailable' });
-    }
-
-    let targetDifficulty = prevDiff;
-    if (typeof predictedDifficulty === 'number') {
-      if (predictedDifficulty > prevDiff) {
-        targetDifficulty += 1.0;
-      } else if (predictedDifficulty < prevDiff) {
-        targetDifficulty -= 1.0;
-      }
-    }
-
-    evaluated.sort((a, b) =>
-      Math.abs(a.difficulty - targetDifficulty) -
-      Math.abs(b.difficulty - targetDifficulty)
-    );
-
-    const chosen = evaluated[0];
-
-    const generatedFile = path.join(generatedDir, `${climbId}.json`);
-    await fs.writeJson(generatedFile, {
-      climbId,
-      chosenHold: chosen,
-      currentHold,
-      previousHold,
-      predictedDifficulty,
-      targetDifficulty,
-      timestamp: Date.now()
-    }, { spaces: 2 });
-
-    res.json({
-      chosenHold: chosen,
-      allCandidates: evaluated
-    });
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Failed to generate next hold");
-  }
-});
 
 /* -----------------------------
    DIGITAL TWIN HELPERS
 ----------------------------- */
 
+// Helper to get all holds from a route grid, sorted bottom to top
 function getSortedRouteHolds(route) {
-  const holds = [];
-  route.grid.forEach((row, r) => {
-    row.forEach((cell, c) => {
-      if (cell !== null) holds.push({ row: r, col: c, color: cell });
+    const holds = [];
+    route.grid.forEach((row, r) => {
+        row.forEach((cell, c) => {
+            if (cell !== null) holds.push({ row: r, col: c, color: cell });
+        });
     });
-  });
-  return holds.sort((a, b) => b.row - a.row);
+    return holds.sort((a, b) => b.row - a.row);
 }
 
+// The core "Twin" API
 app.get('/api/twin/:climbId', async (req, res) => {
-  try {
-    const climbId = req.params.climbId;
-    const attempt = await fs.readJson(path.join(climbsDir, `${climbId}.json`));
+    try {
+        const climbId = req.params.climbId;
+        const attempt = await fs.readJson(path.join(climbsDir, `${climbId}.json`));
+        
+        // We need the original route to know what the user was TRYING to do
+        // Assumes your climb object stores the routeId it was based on
+        const routeId = attempt.routeId; 
+        if (!routeId) return res.status(400).json({ error: "Attempt has no associated routeId" });
+        
+        const route = await fs.readJson(path.join(routesDir, `${routeId}.json`));
 
-    const routeId = attempt.routeId;
-    if (!routeId) return res.status(400).json({ error: "Attempt has no associated routeId" });
+        const crux = findCrux(route, attempt);
+        if (!crux) return res.json({ message: "Route completed! No twin needed.", route });
 
-    const route = await fs.readJson(path.join(routesDir, `${routeId}.json`));
+        // Search 8 neighbors for an easier move
+        const offsets = [[-1,-1], [-1,0], [-1,1], [0,-1], [0,1], [1,-1], [1,0], [1,1]];
+        let bestOption = { ...crux.targetHold, difficulty: 999 };
 
-    const crux = findCrux(route, attempt);
-    if (!crux) return res.json({ message: "Route completed! No twin needed.", route });
+        for (const [dr, dc] of offsets) {
+            const nr = crux.targetHold.row + dr;
+            const nc = crux.targetHold.col + dc;
 
-    const offsets = [[-1,-1], [-1,0], [-1,1], [0,-1], [0,1], [1,-1], [1,0], [1,1]];
-    let bestOption = { ...crux.targetHold, difficulty: 999 };
+            // Stay within grid and avoid invalid holds
+            if (holdLevels[nr] && holdLevels[nr][nc] !== -1 && holdLevels[nr][nc] !== undefined) {
+                const diff = moveDifficulty(crux.previousHold, { row: nr, col: nc });
+                if (diff !== null && diff < bestOption.difficulty) {
+                    bestOption = { row: nr, col: nc, difficulty: diff };
+                }
+            }
+        }
 
-    for (const [dr, dc] of offsets) {
-      const nr = crux.targetHold.row + dr;
-      const nc = crux.targetHold.col + dc;
+        // Create the mutated "Twin" Route
+        const twinRoute = JSON.parse(JSON.stringify(route)); // Clone
+        // Swap the target hold for the better neighbor
+        twinRoute.grid[crux.targetHold.row][crux.targetHold.col] = null;
+        twinRoute.grid[bestOption.row][bestOption.col] = "#00FFFF"; // Electric Cyan
+        twinRoute.name = `${route.name} (Twin Optimized)`;
+        twinRoute.isTwin = true;
+        twinRoute.originalTarget = crux.targetHold;
 
-      if (nr < 0 || nc < 0) continue;
-      if (!holdLevels[nr] || holdLevels[nr][nc] == null) continue;
-      if (holdLevels[nr][nc] === -1) continue;
-
-      const diff = moveDifficulty(crux.previousHold, { row: nr, col: nc });
-      if (diff !== null && diff < bestOption.difficulty) {
-        bestOption = { row: nr, col: nc, difficulty: diff };
-      }
+        res.json(twinRoute);
+    } catch (err) {
+        console.error(err);
+        res.status(500).send("Twin Generation Failed");
     }
-
-    const twinRoute = JSON.parse(JSON.stringify(route));
-    twinRoute.grid[crux.targetHold.row][crux.targetHold.col] = null;
-    twinRoute.grid[bestOption.row][bestOption.col] = "#00FFFF";
-    twinRoute.name = `${route.name} (Twin Optimized)`;
-    twinRoute.isTwin = true;
-    twinRoute.originalTarget = crux.targetHold;
-
-    res.json(twinRoute);
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Twin Generation Failed");
-  }
 });
 
 function findCrux(route, attempt) {
-  const routeHolds = [];
-  route.grid.forEach((row, r) => {
-    row.forEach((cell, c) => {
-      if (cell !== null) {
-        routeHolds.push({ row: r, col: c, color: cell });
-      }
+    // 1. Extract all valid holds from the original route grid
+    const routeHolds = [];
+    route.grid.forEach((row, r) => {
+        row.forEach((cell, c) => {
+            if (cell !== null) {
+                routeHolds.push({ row: r, col: c, color: cell });
+            }
+        });
     });
-  });
 
-  if (routeHolds.length === 0) return null;
+    if (routeHolds.length === 0) return null;
 
-  const attemptHolds = attempt.filledSequence || [];
-  const successfulMoves = attemptHolds.filter(h => h.onRoute);
+    const attemptHolds = attempt.filledSequence || [];
+    
+    // 2. Filter for 'onRoute' to find where the climber actually succeeded
+    const successfulMoves = attemptHolds.filter(h => h.onRoute);
+    
+    let highestRowReached = 18; // Default to just below the grid (the floor)
+    let lastSuccessfulHold = { row: 18, col: 8 }; // Default "ground" starting point
 
-  let highestRowReached = 18;
-  let lastSuccessfulHold = { row: 18, col: 8 };
+    if (successfulMoves.length > 0) {
+        // Find the move with the minimum row value (the highest physical point reached)
+        const highestMove = successfulMoves.reduce((prev, curr) => 
+            (curr.row < prev.row) ? curr : prev
+        );
+        highestRowReached = highestMove.row;
+        lastSuccessfulHold = highestMove;
+    }
 
-  if (successfulMoves.length > 0) {
-    const highestMove = successfulMoves.reduce((prev, curr) =>
-      (curr.row < prev.row) ? curr : prev
-    );
-    highestRowReached = highestMove.row;
-    lastSuccessfulHold = highestMove;
-  }
+    // 3. Find the "Target": The closest route hold ABOVE the highest reached point
+    // We look for route holds where row < highestRowReached
+    let remainingHolds = routeHolds
+        .filter(h => h.row < highestRowReached)
+        .sort((a, b) => b.row - a.row); // Sort so the lowest-down of the "higher" holds is index 0
 
-  let remainingHolds = routeHolds
-    .filter(h => h.row < highestRowReached)
-    .sort((a, b) => b.row - a.row);
+    // 4. FALLBACK LOGIC: If they couldn't even start or the "above" search is empty
+    if (remainingHolds.length === 0) {
+        // Sort all route holds from bottom to top
+        const allSorted = [...routeHolds].sort((a, b) => b.row - a.row);
+        const lowestRouteHold = allSorted[0];
 
-  if (remainingHolds.length === 0) {
-    const allSorted = [...routeHolds].sort((a, b) => b.row - a.row);
-    const lowestRouteHold = allSorted[0];
+        // If the user is currently at or below the lowest hold, target that lowest hold
+        // This helps users who can't even get off the ground.
+        return {
+            targetHold: lowestRouteHold,
+            previousHold: { row: 18, col: 8 } // Ground level launchpad
+        };
+    }
 
+    // 5. SUCCESS: Return the hold they missed and the one they launched from
     return {
-      targetHold: lowestRouteHold,
-      previousHold: { row: 18, col: 8 }
+        targetHold: remainingHolds[0], // The next logical step they failed to reach
+        previousHold: lastSuccessfulHold
     };
-  }
-
-  return {
-    targetHold: remainingHolds[0],
-    previousHold: lastSuccessfulHold
-  };
 }
-
-app.listen(3000, () => console.log('Server running on http://localhost:3000'));
