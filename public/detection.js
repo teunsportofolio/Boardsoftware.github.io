@@ -34,7 +34,28 @@ let lastSentBuffer = new Uint8Array(8).fill(255); // To throttle BLE
 let frameCounter = 0; // To throttle UI text updates
 
 // Pre-allocate limb objects to avoid Garbage Collection (GC) churn
+// New Pose Landmarks for the Skeleton
+const POSE_LANDMARKS = {
+    leftShoulder: 11, rightShoulder: 12,
+    leftElbow: 13,    rightElbow: 14,
+    leftWrist: 15,    rightWrist: 16, // Already using these
+    leftHip: 23,      rightHip: 24,
+    leftKnee: 25,     rightKnee: 26,
+    leftAnkle: 27,    rightAnkle: 28  // Already using these
+};
+
+// Define the "Bones" (which points connect to which)
+const SKELETON_CONNECTIONS = [
+    ["leftShoulder", "rightShoulder"], ["leftShoulder", "leftHip"], ["rightShoulder", "rightHip"], ["leftHip", "rightHip"], // Torso
+    ["leftShoulder", "leftElbow"], ["leftElbow", "leftWrist"], // Left Arm
+    ["rightShoulder", "rightElbow"], ["rightElbow", "rightWrist"], // Right Arm
+    ["leftHip", "leftKnee"], ["leftKnee", "leftAnkle"], // Left Leg
+    ["rightHip", "rightKnee"], ["rightKnee", "rightAnkle"] // Right Leg
+];
+
+// Replace the old LIMB_KEYS with this:
 const LIMB_KEYS = ["leftHand", "rightHand", "leftFoot", "rightFoot"];
+
 const LIMB_LANDMARKS = [15, 16, 27, 28];
 
 // Grid corners for perspective warping
@@ -593,53 +614,78 @@ function updateLimbSpeedPanel() {
   panel.innerHTML = `LH: ${speeds.leftHand.avg.toFixed(2)} moves/sec<br>RH: ${speeds.rightHand.avg.toFixed(2)} moves/sec<br>LF: ${speeds.leftFoot.avg.toFixed(2)} moves/sec<br>RF: ${speeds.rightFoot.avg.toFixed(2)} moves/sec`;
 }
 
-async function markFilledCell(limb, row, col, duration) {
-  const key = `${row},${col}`;
-  const now = performance.now();
-  
-  // 1. Check if the hold exists in the Route Creator's plan
-  const routeHoldLevel = (activeRoute && activeRoute.grid[row]) ? activeRoute.grid[row][col] : null;
 
-  if (!filledCells[limb][key]) {
-    // 2. NEW MOVE DETECTED
-    const moveEntry = {
-      sequence: ++moveCounter,
-      limb,
-      row,
-      col,
-      timestamp: now,
-      duration,
-      onRoute: routeHoldLevel !== null, 
-      prescribedLevel: routeHoldLevel,
-      difficultyScore: 0 // Will be updated by server
-    };
+async function markFilledCell(limb, row, col, duration, rawSkeleton) {
+    const key = `${row},${col}`;
+    const now = performance.now();
+    const activeLimbs = ["leftHand", "rightHand", "leftFoot", "rightFoot"];
 
-    filledCells[limb][key] = { duration, notified: false };
-    filledSequence.push(moveEntry);
+    // 1. Safety Check: If we don't have the grid data yet, don't crash
+    const routeHoldLevel = (activeRoute && activeRoute.grid && activeRoute.grid[row]) 
+                           ? activeRoute.grid[row][col] : null;
 
-  } else {
-    // 3. UPDATING EXISTING HOLD DURATION
-    const move = filledSequence.find(m => m.limb === limb && m.row === row && m.col === col);
-    if (move) {
-      move.duration = Math.max(move.duration, duration);
-      filledCells[limb][key].duration = move.duration;
+    if (!filledCells[limb][key]) {
+        // --- INITIAL CONTACT ---
+        // Capture the full 12-point snapshot for the Replay (All limbs get this)
+        const skeletonSnapshot = getWarpedSkeleton(rawSkeleton, cachedH);
 
-      // 4. TRIGGER DIFFICULTY CALCULATION (Once move is "Solid")
-      if (move.duration >= HOLD_DURATION && !filledCells[limb][key].notified) {
-        filledCells[limb][key].notified = true; // Only ask the server once
-        
-        // Find the previous move for this limb to calculate distance/effort
-        const prevMove = filledSequence.filter(m => m.limb === limb).slice(-2)[0];
-        
-        if (prevMove && activeRoute) {
-          const stats = await getMoveDifficulty(prevMove, move);
-          move.difficultyScore = stats.difficulty;
-          console.log(`Move #${move.sequence} Difficulty: ${stats.difficulty.toFixed(1)}`);
+        const moveEntry = {
+            sequence: ++moveCounter,
+            limb,
+            row,
+            col,
+            timestamp: now,
+            duration,
+            skeleton: skeletonSnapshot,
+            onRoute: routeHoldLevel !== null,
+            prescribedLevel: routeHoldLevel,
+            difficultyScore: 0
+        };
+
+        filledCells[limb][key] = { duration, notified: false };
+        filledSequence.push(moveEntry);
+
+    } else {
+        // --- UPDATING DURATION ---
+        const move = filledSequence.find(m => m.limb === limb && m.row === row && m.col === col);
+        if (move) {
+            move.duration = Math.max(move.duration, duration);
+            filledCells[limb][key].duration = move.duration;
+
+            // --- DIFFICULTY CALCULATION (Hands & Feet Only) ---
+            // Only trigger if: 
+            // 1. It's a hand/foot 2. Hold is "Solid" 3. Not yet calculated 4. We have a Route ID
+            if (activeLimbs.includes(limb) && 
+                move.duration >= HOLD_DURATION && 
+                !filledCells[limb][key].notified && 
+                activeRoute?.id) {
+                
+                // Find the previous move for this specific limb to measure distance
+                const limbMoves = filledSequence.filter(m => m.limb === limb);
+                const prevMove = limbMoves[limbMoves.length - 2]; 
+
+                if (prevMove) {
+                    filledCells[limb][key].notified = true; 
+                    
+                    try {
+                        const stats = await getMoveDifficulty(prevMove, move);
+                        
+                        // Check if stats returned valid data before using .toFixed()
+                        if (stats && typeof stats.difficulty === 'number') {
+                            move.difficultyScore = stats.difficulty;
+                            console.log(`✅ Move #${move.sequence} (${limb}): Difficulty ${stats.difficulty.toFixed(1)}`);
+                        }
+                    } catch (err) {
+                        // Silently catch errors (e.g. server down) to keep detection running
+                        console.warn("Difficulty API request failed.");
+                    }
+                }
+            }
         }
-      }
     }
-  }
-  updateStatsUI();
+
+    // Update the UI if the function exists
+    if (typeof updateStatsUI === "function") updateStatsUI();
 }
 
 // Helper to talk to your Node.js API
@@ -658,12 +704,11 @@ async function getMoveDifficulty(oldHold, newHold) {
 
 function onResults(results) {
     if (!firstFrameReceived) {
-          firstFrameReceived = true;
-          const loader = document.getElementById("loading-overlay");
-          if (loader) loader.classList.add("hidden"); // This triggers the CSS fade
-          console.log("First AI frame received. Hiding loader.");
-      }
-    // 1. Calculate aspect ratio fitting (Always happens)
+        firstFrameReceived = true;
+        const loader = document.getElementById("loading-overlay");
+        if (loader) loader.classList.add("hidden");
+    }
+
     const inputWidth = results.image.width;
     const inputHeight = results.image.height;
     const outputAspect = canvas.width / canvas.height;
@@ -682,33 +727,23 @@ function onResults(results) {
         offsetY = (inputHeight - drawHeight) / 2;
     }
 
-    // 2. Draw Video Frame (Always happens)
     ctx.save();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.translate(canvas.width, 0); // Mirror for Selfie
+    ctx.translate(canvas.width, 0); 
     ctx.scale(-1, 1);
     ctx.drawImage(results.image, offsetX, offsetY, drawWidth, drawHeight, 0, 0, canvas.width, canvas.height);
     ctx.restore();
 
-    // 3. Grid & Homography Management
-    // We update math whenever the grid moves, even if not "climbing" yet
     if (gridNeedsUpdate) {
         updateHomographies();
-        gridNeedsUpdate = false; // Reset the flag immediately
+        gridNeedsUpdate = false;
     }
 
-    // ALWAYS draw the grid lines and corner dots so the user can calibrate
-    // We pass cachedHinv here instead of null so the lines show up immediately
     drawPerspectiveGrid(cachedHinv);
-
     drawPlannedRoute(cachedHinv);
 
-    // 4. THE GATEKEEPER
-    // If the app isn't "Active" (button not pressed), we stop here.
-    // This means no limb dots, no progress rings, and no BLE data.
     if (!appActive) return; 
 
-    // 5. Active Limb Detection Logic
     const ledData = { leftHand: null, rightHand: null, leftFoot: null, rightFoot: null };
 
     if (results.poseLandmarks) {
@@ -716,19 +751,16 @@ function onResults(results) {
             const limbName = LIMB_KEYS[i];
             const lm = results.poseLandmarks[LIMB_LANDMARKS[i]];
 
-            // Only process if landmark is visible enough
             if (!lm || lm.visibility < CONFIDENCE_THRESHOLD) {
                 holdTimers[limbName].currentKey = null;
                 holdTimers[limbName].start = 0;
                 continue;
             }
 
-            // Remap coordinates to mirrored canvas
             const mirroredX = (1 - lm.x); 
             const px = (mirroredX * inputWidth - offsetX) * (canvas.width / drawWidth);
             const py = (lm.y * inputHeight - offsetY) * (canvas.height / drawHeight);
             
-            // Transform screen point to grid 0.0 - 1.0 coordinates
             const warped = warpPoint(cachedH, px, py);
 
             if (warped.x >= 0 && warped.x <= 1 && warped.y >= 0 && warped.y <= 1) {
@@ -744,10 +776,8 @@ function onResults(results) {
                 const duration = performance.now() - holdTimers[limbName].start;
                 const progress = Math.min(duration / HOLD_DURATION, 1);
 
-                // Draw active hold feedback
                 highlightCell(cachedHinv, row, col, LIMB_COLORS[limbName]);
 
-                // Draw Progress Ring around the joint
                 ctx.beginPath();
                 ctx.arc(px, py, 20, -Math.PI / 2, -Math.PI / 2 + progress * 2 * Math.PI);
                 ctx.strokeStyle = LIMB_COLORS[limbName];
@@ -755,13 +785,13 @@ function onResults(results) {
                 ctx.stroke();
 
                 if (duration >= HOLD_DURATION) {
-                    markFilledCell(limbName, row, col, duration);
+                    // PASS THE SKELETON DATA HERE FOR THE REPLAY
+                    markFilledCell(limbName, row, col, duration, results.poseLandmarks);
                 }
                 
                 ledData[limbName] = [row, col];
             }
 
-            // Draw the Joint Dot (White indicator)
             ctx.beginPath();
             ctx.arc(px, py, 8, 0, 2 * Math.PI);
             ctx.fillStyle = "white";
@@ -769,10 +799,10 @@ function onResults(results) {
         }
     }
 
-    // 6. Draw Persistent History (Cells you have already "held")
+    // 6. FIXED: Draw Persistent History (Removed the broken POSE_LANDMARKS reference)
     LIMB_KEYS.forEach((limb) => {
-        Object.keys(filledCells[limb]).forEach((k) => {
-            const [r, c] = k.split(",").map(Number);
+        Object.keys(filledCells[limb]).forEach((cellKey) => {
+            const [r, c] = cellKey.split(",").map(Number);
             highlightCell(cachedHinv, r, c, FILLED_COLORS[limb]);
         });
     });
@@ -810,6 +840,57 @@ setInterval(() => {
     }
   }
 }, 50);
+
+/**
+ * Transforms raw MediaPipe landmarks into a flat 0-1 grid space
+ * using the current homography matrix.
+ */
+function getWarpedSkeleton(landmarks, H) {
+    if (!landmarks || !H) return null;
+
+    const warped = {};
+    const essentialIndices = [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
+
+    // We need the same offset/scaling used in onResults
+    const inputWidth = videoElement.videoWidth;
+    const inputHeight = videoElement.videoHeight;
+    const outputAspect = canvas.width / canvas.height;
+    const inputAspect = inputWidth / inputHeight;
+
+    let drawWidth, drawHeight, offsetX, offsetY;
+    if (inputAspect > outputAspect) {
+        drawHeight = inputHeight;
+        drawWidth = inputHeight * outputAspect;
+        offsetX = (inputWidth - drawWidth) / 2;
+        offsetY = 0;
+    } else {
+        drawWidth = inputWidth;
+        drawHeight = inputWidth / outputAspect;
+        offsetX = 0;
+        offsetY = (inputHeight - drawHeight) / 2;
+    }
+
+    essentialIndices.forEach(idx => {
+        const lm = landmarks[idx];
+        if (lm) {
+            // 1. Mirror and Map to Camera Pixels (MATCHING onResults logic)
+            const mirroredX = (1 - lm.x); 
+            const px = (mirroredX * inputWidth - offsetX) * (canvas.width / drawWidth);
+            const py = (lm.y * inputHeight - offsetY) * (canvas.height / drawHeight);
+            
+            // 2. Warp the point into 0.0 - 1.0 Grid Space
+            const w = warpPoint(H, px, py);
+            
+            // 3. Save with a visibility fallback
+            warped[idx] = { 
+                x: w.x, 
+                y: w.y, 
+                visibility: lm.visibility || 1.0 
+            };
+        }
+    });
+    return warped;
+}
 
 /* ================================================================================
    MODULE 6: REPLAY, STATISTICS & UI ANIMATION
@@ -871,9 +952,7 @@ function updateStatsUI() {
 
 if (resetBtn) {
   resetBtn.addEventListener("click", () => {
-    Object.keys(filledCells).forEach((l) => (filledCells[l] = {}));
-    Object.keys(holdTimers).forEach((l) => (holdTimers[l] = {}));
-    filledSequence = [];
+    resetGrid(); // Keep it centralized!
   });
 }
 
@@ -1031,10 +1110,10 @@ function endClimb() {
         const attemptName = input.value || "Unnamed Attempt";
 
         const climbData = {
-            name: attemptName, // The name of this specific attempt
-            routeName: activeRoute ? activeRoute.name : "Unknown Route", // The name of the underlying route
+            name: attemptName,
+            routeName: activeRoute ? activeRoute.name : "Unknown Route",
             timestamp: Date.now(),
-            filledSequence: filledSequence, 
+            filledSequence: filledSequence, // This now contains the .skeleton objects!
             grid: activeRoute ? activeRoute.grid : null, 
             rows: GRID_ROWS,
             cols: GRID_COLS,
@@ -1483,4 +1562,3 @@ async function generateDigitalTwin(climbId) {
         console.error("Twin Generation Error:", err);
     }
 }
-
