@@ -11,6 +11,14 @@ const FILLED_COLORS = {
     rightFoot: "#FFEB3B" // Match your boardEndColor
 };
 
+const POSE_CONNECTIONS = [
+    [11, 12], [11, 23], [12, 24], [23, 24], // Torso (Shoulders to Hips)
+    [11, 13], [13, 15], // Left Arm (Shoulder-Elbow-Wrist)
+    [12, 14], [14, 16], // Right Arm
+    [23, 25], [25, 27], // Left Leg (Hip-Knee-Ankle)
+    [24, 26], [26, 28]  // Right Leg
+];
+
 document.addEventListener("DOMContentLoaded", async () => {
     canvas = document.getElementById("replay-canvas");
     ctx = canvas.getContext("2d");
@@ -151,10 +159,8 @@ function drawGrid() {
 }
 
 function redraw(upToIdx) {
-    // 1. Reset and draw the base grid + ghost holds
     drawGrid(); 
 
-    // 2. Safety: If we're at the very start, just update UI and exit
     if (upToIdx <= 0) {
         updateMovePanel(-1);
         updateSliderFill();
@@ -163,15 +169,12 @@ function redraw(upToIdx) {
 
     const { offsetX, offsetY, cellSize } = getGridDimensions();
 
-    // 3. Draw the active sequence moves up to the current index
+    // 1. Draw all static hold sequence rectangles up to current
     for (let i = 0; i < upToIdx; i++) {
         const move = filledSequence[i];
         if (!move) continue;
 
-        // Get the specific color for the limb used (Hand, Foot, etc.)
         const baseColor = FILLED_COLORS[move.limb] || "#FFFFFF";
-        
-        // We use 0.9 alpha for sequence moves so they are distinct but slightly soft
         ctx.fillStyle = hexToRgba(baseColor, 0.9);
         
         const padding = cellSize * 0.15;
@@ -179,17 +182,12 @@ function redraw(upToIdx) {
         const y = offsetY + move.row * cellSize + padding;
         const size = cellSize - (padding * 2);
 
-        // Draw the sequence move as a rounded rectangle
         ctx.beginPath();
-        if (ctx.roundRect) {
-            ctx.roundRect(x, y, size, size, 8);
-        } else {
-            // Fallback for older browsers
-            ctx.rect(x, y, size, size);
-        }
+        if (ctx.roundRect) ctx.roundRect(x, y, size, size, 8);
+        else ctx.rect(x, y, size, size);
         ctx.fill();
 
-        // 4. Highlight the "Current" move (the very last one in the sequence)
+        // Highlight the very last hold reached
         if (i === upToIdx - 1) {
             ctx.strokeStyle = "white";
             ctx.lineWidth = 3;
@@ -197,9 +195,118 @@ function redraw(upToIdx) {
         }
     }
 
-    // 5. Sync the UI panel and slider
+    // 2. --- GHOST TRAIL LOGIC ---
+    // We want to draw the current skeleton PLUS the 3 previous ones
+    const trailLength = 3; 
+    const startTrail = Math.max(0, upToIdx - 1 - trailLength);
+
+    for (let i = startTrail; i < upToIdx; i++) {
+        const move = filledSequence[i];
+        if (move && move.skeleton) {
+            // Calculate opacity based on how old the move is
+            // Current move (i === upToIdx -1) will be 1.0 alpha
+            // 3 moves ago will be ~0.2 alpha
+            const age = (upToIdx - 1) - i; 
+            const opacity = 1.0 - (age * 0.34); 
+            
+            // Draw the skeleton with this specific fade
+            drawSkeleton(move.skeleton, opacity);
+        }
+    }
+
     updateMovePanel(upToIdx - 1);
     updateSliderFill();
+}
+
+/**
+ * Helper to draw the MediaPipe skeleton bones
+ * Make sure POSE_CONNECTIONS is defined at the top of your script!
+ */
+function drawSkeleton(skeleton, opacity = 1.0) {
+    if (!skeleton) return;
+    const { offsetX, offsetY, gridWidth, gridHeight } = getGridDimensions();
+
+    ctx.save();
+    
+    // --- GHOSTLY CYAN STYLE ---
+    ctx.lineWidth = 3.5; 
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    
+    // Set the outline color with the fading opacity
+    ctx.strokeStyle = `rgba(230, 188, 115, ${opacity})`;
+    
+    // Fill dots (joints) with White, but use opacity to fade them too
+    ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`; 
+
+    // Neon Glow (Optional, if you want that "digital" look)
+    // ctx.shadowBlur = 10;
+    // ctx.shadowColor = `rgba(0, 255, 255, ${opacity})`;
+
+    const getPos = (index) => {
+        const pt = skeleton[index]; 
+        if (!pt || pt.visibility < 0.2) return null;
+        return {
+            x: offsetX + (pt.x * gridWidth),
+            y: offsetY + (pt.y * gridHeight)
+        };
+    };
+
+    const sL = getPos(11);
+    const sR = getPos(12);
+
+    if (sL && sR) {
+        const midX = (sL.x + sR.x) / 2;
+        const midY = (sL.y + sR.y) / 2;
+        const shDist = Math.hypot(sL.x - sR.x, sL.y - sR.y);
+        
+        // Calculate the tilt of the shoulders
+        const angle = Math.atan2(sR.y - sL.y, sR.x - sL.x);
+
+        // --- STROKED ROTATED HEAD ---
+        ctx.save();
+        ctx.translate(midX, midY); // Move origin to shoulder midpoint
+        ctx.rotate(angle);         // Rotate context to match shoulder tilt
+        
+        const headRadius = shDist * 0.28; // Smaller, proportional head
+        const headOffset = shDist * 0.55; // Distance above the shoulder line
+
+        // Draw the Head Circle (Outlined, NOT filled)
+        ctx.beginPath();
+        // x=0, y= -offset (upward relative to rotated shoulder line)
+        ctx.arc(0, -headOffset, headRadius, 0, Math.PI * 2);
+        
+        // We use STROKE, not fill
+        ctx.stroke(); 
+        
+        ctx.restore();
+    }
+
+    // --- Draw defined bones (POSE_CONNECTIONS) ---
+    POSE_CONNECTIONS.forEach(([startIdx, endIdx]) => {
+        const p1 = getPos(startIdx);
+        const p2 = getPos(endIdx);
+        if (p1 && p2) {
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.stroke();
+        }
+    });
+
+    // --- Draw essential joints (dots) ---
+    const essentialJoints = [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
+    essentialJoints.forEach(idx => {
+        const p = getPos(idx);
+        if (p) {
+            ctx.beginPath();
+            // Dots are still white/filled to represent joint centers
+            ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    });
+
+    ctx.restore();
 }
 
 /**
