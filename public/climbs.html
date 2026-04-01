@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Climbing AI - Route Creator</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,300,0,0" />
+    <style>
+        #creator-container {
+            position: absolute;
+            top: 80px; bottom: 100px;
+            left: 0; right: 0;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            z-index: 10;
+            pointer-events: none; /* Allows clicks to pass through to the canvas */
+        }
+        #route-canvas {
+            background: #1a1a1a;
+            border: 2px solid var(--accentColor);
+            border-radius: 12px;
+            touch-action: none;
+            pointer-events: auto;
+        }
+        .toolbox {
+            position: fixed;
+            bottom: 110px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            padding: 10px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 50px;
+            z-index: 1000;
+            pointer-events: auto;
+            backdrop-filter: blur(10px);
+        }
+        .tool {
+            width: 44px; height: 44px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+            color: white;
+            font-size: 18px;
+        }
+        .tool.active { border-color: white; transform: scale(1.1); box-shadow: 0 0 10px rgba(255,255,255,0.3); }
+        
+    </style>
+</head>
+<body>
+    <div id="app-viewport">
+        <header class="topBar">
+            <span class="headerFont" id="climbName">ROUTE BUILDER</span>
+            <button class="btn" id="saveRouteBtn" style="background:var(--accentColor); color:var(--mainColor); padding: 5px 15px; font-weight: bold;">SAVE</button>
+        </header>
+
+        <div id="creator-container">
+            <canvas id="route-canvas"></canvas>
+        </div>
+
+        <div class="toolbox">
+            <div class="tool active" data-color="#4CAF50" title="Start" style="background:#4CAF50;">
+                <span class="material-symbols-rounded">play_arrow</span>
+            </div>
+            <div class="tool" data-color="#2196F3" title="Hand" style="background:#2196F3;">
+                <span class="material-symbols-rounded">front_hand</span>
+            </div>
+            <div class="tool" data-color="#FF9800" title="Foot" style="background:#FF9800;">
+                <span class="material-symbols-rounded">barefoot</span>
+            </div>
+            <div class="tool" data-color="#F44336" title="End" style="background:#F44336;">
+                <span class="material-symbols-rounded">sports_score</span>
+            </div>
+            <div id="eraser" class="tool" style="background:#333;">
+                <span class="material-symbols-rounded">delete</span>
+            </div>
+        </div>
+
+        <div id="save-modal" class="modal-overlay hidden">
+            <div class="modal-content">
+                <div class="modal-title">SAVE ROUTE</div>
+                <div class="modal-text">Give your creation a name and a grade.</div>
+
+                <input type="text" id="climbNameInput" class="modal-input" placeholder="Route Name" autocomplete="off">
+                
+                <select id="climbGradeInput" class="modal-input">
+                    <option value="" disabled selected>Select Grade</option>
+                    <optgroup label="Grade 6">
+                        <option value="6A">6A</option>
+                        <option value="6B">6B</option>
+                        <option value="6C">6C</option>
+                    </optgroup>
+                    <optgroup label="Grade 7">
+                        <option value="7A">7A</option>
+                        <option value="7B">7B</option>
+                        <option value="7C">7C</option>
+                    </optgroup>
+                    <optgroup label="Grade 8">
+                        <option value="8A">8A</option>
+                        <option value="8B">8B</option>
+                        <option value="8C">8C</option>
+                    </optgroup>
+                </select>
+
+                <div class="modal-actions">
+                    <button id="cancelSave" class="modal-btn secondary" style="pointer-events: auto;">CANCEL</button>
+                    <button id="finalConfirmSave" class="modal-btn primary" style="pointer-events: auto;">CONFIRM</button>
+                </div>
+            </div>
+        </div>
+
+        <nav class="bottomBar">
+            <button class="nav-item climbsIcon navBtnActive" onclick="location.href = 'climbs.html'"><span class="material-symbols-rounded" style="color:var(--mainColor);">cards_star</span></button>
+            <button class="nav-item detectionIcon" onclick="location.href = 'index.html'"><span class="material-symbols-rounded">photo_camera</span></button>
+            <button class="nav-item profileIcon" onclick="location.href = 'profile.html'"><span class="material-symbols-rounded">account_circle</span></button>
+        </nav>
+    </div>
+
+    <script>
+        // Ensure camera is killed if the user navigates away
+        window.onbeforeunload = function() {
+            if (window.localStream) {
+                window.localStream.getTracks().forEach(track => track.stop());
+            }
+        };
+
+        const canvas = document.getElementById("route-canvas");
+        const ctx = canvas.getContext("2d");
+        const ROWS = 18; const COLS = 16;
+        let selectedColor = "#4CAF50";
+        let grid = Array(ROWS).fill().map(() => Array(COLS).fill(null));
+        let holdLevels = [];
+        let isDrawing = false;
+
+        async function init() {
+            try {
+                const hd = await fetch("/api/holddifficulty");
+                const hdJson = await hd.json();
+                holdLevels = hdJson["Hold difficulty level"];
+
+                const container = document.getElementById("creator-container");
+                const size = Math.min(window.innerWidth * 0.9, container.clientHeight * 0.9);
+                canvas.width = size;
+                canvas.height = (size / COLS) * ROWS;
+
+                // Canvas Event Listeners
+                canvas.addEventListener("pointerdown", e => { isDrawing = true; handleInput(e); });
+                canvas.addEventListener("pointermove", e => { if(isDrawing) handleInput(e); });
+                window.addEventListener("pointerup", () => isDrawing = false);
+
+                draw();
+            } catch (err) { console.error(err); }
+        }
+
+        function handleInput(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            const col = Math.floor(x / (rect.width / COLS));
+            const row = Math.floor(y / (rect.height / ROWS));
+
+            if (row >= 0 && row < ROWS && col >= 0 && col < COLS) {
+                if (holdLevels[row][col] !== -1 && holdLevels[row][col] !== null) {
+                    grid[row][col] = (selectedColor === "erase") ? null : selectedColor;
+                    draw();
+                }
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const cellW = canvas.width / COLS;
+            const cellH = canvas.height / ROWS;
+
+            for(let r=0; r<ROWS; r++) {
+                for(let c=0; c<COLS; c++) {
+                    const hasHold = holdLevels[r] && holdLevels[r][c] !== -1 && holdLevels[r][c] !== null;
+                    ctx.strokeStyle = hasHold ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.03)";
+                    ctx.strokeRect(c*cellW, r*cellH, cellW, cellH);
+
+                    if(grid[r][c]) {
+                        ctx.fillStyle = grid[r][c];
+                        ctx.beginPath();
+                        ctx.arc(c*cellW + cellW/2, r*cellH + cellH/2, cellW/2.8, 0, Math.PI*2);
+                        ctx.fill();
+                        ctx.strokeStyle = "white";
+                        ctx.lineWidth = 1;
+                        ctx.stroke();
+                    }
+                }
+            }
+        }
+
+        // Tool Selection
+        document.querySelectorAll(".tool").forEach(t => {
+            t.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                document.querySelectorAll(".tool").forEach(el => el.classList.remove("active"));
+                t.classList.add("active");
+                selectedColor = t.id === "eraser" ? "erase" : t.dataset.color;
+            });
+        });
+
+        // Modal Controls
+        document.getElementById("saveRouteBtn").onclick = (e) => {
+            e.preventDefault();
+            document.getElementById("save-modal").classList.remove("hidden");
+            // Auto-focus the name input for better UX
+            setTimeout(() => document.getElementById("climbNameInput").focus(), 300);
+        };
+        
+        document.getElementById("cancelSave").onclick = () => {
+            document.getElementById("save-modal").style.display = "none";
+        };
+
+        // FORCE FOCUS FIX FOR MOBILE INPUTS
+        document.querySelectorAll('#save-modal input').forEach(input => {
+            input.addEventListener('pointerdown', (e) => {
+                e.stopPropagation(); // Stop the modal/viewport from eating the tap
+                input.focus();
+            });
+        });
+
+        document.getElementById("finalConfirmSave").onclick = async () => {
+            const routeData = {
+                name: document.getElementById("climbNameInput").value || "New Route",
+                grade: document.getElementById("climbGradeInput").value || "N/A",
+                grid: grid,
+                rows: ROWS, // Add this
+                cols: COLS, // Add this
+                timestamp: Date.now()
+            };
+
+            const res = await fetch('/api/routes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(routeData)
+            });
+
+            if(res.ok) {
+                const data = await res.json();
+                // The redirect
+                window.location.href = `index.html?id=${data.id}`;
+            }
+        };
+
+        init();
+    </script>
+</body>
+</html>

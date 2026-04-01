@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Climb Replay</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,300,0,0" />
+    <style>
+        #replay-canvas {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100dvh;
+            z-index: 5;
+        }
+
+        /* 1. The Stats Card (Top Left) */
+        #currentMovePanel {
+            position: absolute;
+            top: calc(var(--safe-top) + 90px); /* Below the TopBar height */
+            left: 20px;
+            width: 160px;
+            background: rgba(249, 244, 232, 0.9); /* var(--mainColor) with transparency */
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            z-index: 100;
+            display: none;
+            transition: all 0.3s ease;
+        }
+
+        /* 2. Integrated Replay Bar (Bottom) */
+        .replay-controls-wrapper {
+            position: absolute;
+            bottom: 100px; /* Sits right above the BottomBar */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 75%;
+            background: var(--mainColor);
+            padding: 15px 25px;
+            border-radius: 999px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            pointer-events: auto;
+        }
+
+        /* Custom Slider Styling */
+        #replaySlider {
+            flex-grow: 1;
+            -webkit-appearance: none;
+            appearance: none;
+            /* This gradient will be updated by JS to create the "fill" effect */
+            background: linear-gradient(to right, var(--accentColor) 0%, #ddd 0%);
+            height: 6px;
+            border-radius: 3px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        /* Style the thumb (the circle) */
+        #replaySlider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border: 3px solid var(--accentColor);
+            border-radius: 50%;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            transition: transform 0.1s ease;
+        }
+
+        #replaySlider::-webkit-slider-thumb:active {
+            transform: scale(1.2);
+        }
+
+        .step-counter {
+            font-family: 'mainFontBold';
+            color: var(--accentColor);
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="replay-canvas"></canvas>
+
+    <div id="app-viewport">
+        <div class="topBar">
+            <span class="headerFont" id="climbDisplayName">REPLAYING CLIMB</span>
+            <div class="topBarGroup">
+                <button class="btn bluetoothIcon" onclick="location.href='index.html'">
+                    <span class="material-symbols-rounded">close</span>
+                </button>
+            </div>
+        </div>
+
+        <div id="currentMovePanel">
+            </div>
+
+        <div class="replay-controls-wrapper">
+            <input type="range" id="replaySlider" min="0" max="0" value="0">
+            <span id="sliderStep" class="step-counter">0</span>
+        </div>
+
+        <nav class="bottomBar">
+            <button class="nav-item climbsIcon" onclick="location.href = 'climbs.html'">
+                <span class="material-symbols-rounded"">cards_star</span>
+            </button>
+
+            <button class="nav-item detectionIcon" onclick="location.href = 'index.html'">
+                <span class="material-symbols-rounded">photo_camera</span>
+            </button>
+
+            <button class="nav-item profileIcon" onclick="location.href = 'profile.html'">
+                <span class="material-symbols-rounded">account_circle</span>
+            </button>
+        </nav>
+    </div>
+
+    <script src="replay.js"></script>
+</body>
+</html>
