@@ -749,24 +749,41 @@ async function markFilledCell(limb, row, col, duration, rawSkeleton) {
                     if (coachMode) {
                         const statusBox = document.getElementById("coach-status-box");
                         const statusText = document.getElementById("coach-status-text");
-                        
-                        // Show box on very first move
-                        if (filledSequence.length === 1) statusBox.classList.remove("hidden");
-                        // 1. Count how many times THIS SPECIFIC limb has moved
-                        const movesForThisLimb = filledSequence.filter(m => m.limb === limb).length;
 
-                        // 2. Logic: Only suggest if this is the 2nd (or more) time this limb has moved
+                        if (filledSequence.length === 1) statusBox.classList.remove("hidden");
+
+                        const movesForThisLimb = filledSequence.filter(m => m.limb === limb).length;
                         const isLimbEstablished = movesForThisLimb >= 2;
 
                         if (isLimbEstablished) {
-                            // 1. Check if we ALREADY have a suggestion waiting for us
-                            // 2. If we do, only update IF the limb we just moved IS the suggested target
+                            const hasActiveRoute = !!(activeRoute && activeRoute.grid);
+                            const isOnRoute = move.onRoute;
+
+                            if (hasActiveRoute && isOnRoute) {
+                                // --- VISUAL LOGGING FOR ON-ROUTE CLIMBING ---
+                                console.log(`%c 🟢 ${limb} moved on route.`, "color: #4CAF50; font-weight: bold;");
+                                
+                                statusText.innerText = "ON ROUTE";
+                                statusText.style.color = "var(--accentColor)"; // Usually Green/Cyan
+                                
+                                if (activeSuggestion) {
+                                    console.log("%c ✅ Recovery target cleared.", "color: #4CAF50");
+                                    activeSuggestion = null;
+                                }
+                                // We don't 'return' here anymore so the code stays 'alive' 
+                                // but we won't trigger fetchNextSuggestion because of the logic below.
+                            }
+
                             const isTargetReached = activeSuggestion && 
                                                     limb === activeSuggestion.forLimb && 
                                                     row === activeSuggestion.row && 
                                                     col === activeSuggestion.col;
 
-                            const shouldRequestNew = !activeSuggestion || isTargetReached;
+                            // ONLY request a new suggestion if:
+                            // 1. We are in Free Climb Mode (no route)
+                            // 2. OR we have deviated from the route (!isOnRoute)
+                            const needsSuggestion = !hasActiveRoute || !isOnRoute;
+                            const shouldRequestNew = needsSuggestion && (!activeSuggestion || isTargetReached);
 
                             if (shouldRequestNew) {
                                 const partners = {
@@ -775,10 +792,13 @@ async function markFilledCell(limb, row, col, duration, rawSkeleton) {
                                 };
                                 const targetLimb = partners[limb];
                                 
-                                console.log(`%c 🎯 Target Reached or New Phase: Requesting suggestion for ${targetLimb}`, "color: #00FFFF");
+                                if (hasActiveRoute && !isOnRoute) {
+                                    statusText.innerText = "RECOVERY SUGGESTED";
+                                    statusText.style.color = "#FF4500"; 
+                                    console.log(`%c ⚠️ DEVIATION: ${limb} is off-route. Requesting recovery.`, "color: #FF4500");
+                                }
+
                                 fetchNextSuggestion(move, bodyState[targetLimb], limb); 
-                            } else {
-                                console.log(`%c ✋ Suggestion Active: Ignoring ${limb} jitter to keep ${activeSuggestion.forLimb} target stable.`, "color: #888");
                             }
                         } else {
                             statusText.innerText = `${limb} Established`;
@@ -1015,7 +1035,7 @@ function getWarpedSkeleton(landmarks, H) {
 }
 
 async function fetchNextSuggestion(move, anchorForNextMove, limb) {
-    const rId = activeRoute ? activeRoute.id : "free-climb";
+    const rId = (activeRoute && move.onRoute) ? activeRoute.id : "free-climb";
     
     // 1. UPDATE LIVE BODY STATE
     bodyState[limb] = { row: move.row, col: move.col };
@@ -1124,6 +1144,8 @@ function resetGrid() {
   filledSequence = [];
   moveCounter = 0;
   activeSuggestion = null; // Removes the pulsing box from the canvas immediately
+  document.getElementById("routeBtn").classList.remove("disabled");
+  document.getElementById("modeToggleBtn").classList.remove("disabled");
   
   // 4. CRITICAL: Reset the Body State (Virtual Skeleton)
   // If we don't do this, the AI thinks the limbs are already "Established"
@@ -1515,7 +1537,11 @@ window.addEventListener("load", async () => {
         const statusText = document.getElementById("loading-status"); 
         // Run the dependency check
         if (statusText) statusText.textContent = "Loading AI Models...";
+        document.querySelector(".detection-sub-bar").style.display = "none";
+
         await waitForDependencies();
+
+        document.querySelector(".detection-sub-bar").style.display = "flex";
 
         // Reference the buttons
         const startBtn = document.getElementById("startBtn");
@@ -1535,6 +1561,8 @@ window.addEventListener("load", async () => {
                   appActive = true;
                   resetGrid(); // Clear previous moves
                   startBtn.style.backgroundColor = "var(--accentColor)";
+                  document.getElementById("routeBtn").classList.add("disabled");
+                  document.getElementById("modeToggleBtn").classList.add("disabled");
               } else {
                   // --- STOPPING ---
                   // We do NOT flip appActive here manually, endClimb() will handle the state
