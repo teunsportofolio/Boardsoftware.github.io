@@ -832,3 +832,9 @@ input:checked + .slider:before { transform: translateX(20px); }
     text-transform: uppercase;
     white-space: nowrap; /* CRITICAL: Prevents text from jumping to second row */
 }
+
+.disabled {
+    opacity: 0.5;
+    pointer-events: none; /* Zorgt dat de knop ook niet meer klikbaar is */
+    cursor: not-allowed;  /* Toont een 'verboden' icoon bij hover */
+}
