@@ -1,0 +1,277 @@
+/* --- DESIGN SYSTEM: Colors & Fonts --- */
+:root {
+    --mainColor: #F9F4E8;
+    /* Gold/Accent */
+    --accentColor: #E6BC73;
+    --bgColor: #000000;
+
+    /* Board specific colors for detection circles */
+    --boardStartColor: #4CAF50;
+    --boardHoldColor: #2196F3;
+    --boardEndColor: #F44336;
+    --boardFootColor: #FFEB3B;
+
+    /* Safe Areas for Mobile */
+    --safe-top: 20px;
+    --safe-bottom: 20px;
+}
+
+/* Fonts */
+@font-face {
+    font-family: 'mainFont';
+    /*a name to be used later*/
+    src: url(fonts/Montserrat-Regular.ttf);
+}
+
+@font-face {
+    font-family: 'mainFontBold';
+    /*a name to be used later*/
+    src: url(fonts/Montserrat-SemiBold.ttf);
+}
+
+.headerFont {
+    font-family: mainFontBold;
+    letter-spacing: 3px;
+    font-size: 14px;
+    margin-left: 10px;
+}
+
+.textFont {
+    font-family: mainFont;
+    font-weight: 400;
+    font-size: 16px;
+}
+
+.subFont {
+    font-family: mainFont;
+    font-weight: 600;
+    font-size: 10px;
+    color: #888;
+}
+
+.iconFont {
+    font-family: mainFontBold;
+    font-size: 10px;
+}
+
+/* Base Reset */
+body,
+html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+/* --- MAIN NAVIGATION --- */
+.topBar {
+    position: absolute;
+    top: var(--safe-top);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80%;
+    height: 54px;
+    background: var(--mainColor);
+    /* Fixed Case-Sensitivity */
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 15px;
+    z-index: 100;
+    pointer-events: auto;
+    /* Makes buttons clickable again */
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.topBarGroup {
+    display: flex;
+    align-items: center;
+    gap: 8px; /* Space between dropdown and bluetooth button */
+}
+
+.bottomBar {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    height: calc(80px + var(--safe-bottom));
+    background: var(--mainColor);
+    /* Fixed Case-Sensitivity */
+    display: flex;
+    justify-content: center;
+    gap: 5vw;
+    align-items: center;
+    padding-bottom: var(--safe-bottom);
+    z-index: 100;
+    pointer-events: auto;
+    /* Makes buttons clickable again */
+}
+
+.nav-item {
+    background: transparent;
+    border: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 0;
+    cursor: pointer;
+    pointer-events: auto;
+    width: 80px;
+    /* Gives a consistent tap area */
+}
+
+/* --- INPUT TYPES --- */
+
+.btn {
+    border-radius: 999px;
+    border: none;
+    cursor: pointer;
+    background: var(--accentColor);
+    /* Changed to Accent for visibility */
+    transition: transform 0.1s;
+    pointer-events: auto;
+    height: 38px;
+}
+
+.mainActionButton {
+    width: 116px;
+    height: 116px;
+    position: relative;
+    top: -30px;
+    border: 16px solid var(--mainColor) !important;
+}
+
+.inputField {
+    border-radius: 10px;
+    border: 1px solid #ccc;
+    padding: 10px;
+}
+
+.dropDownContainer {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.dropDown {
+    appearance: none;
+    -webkit-appearance: none;
+    background: var(--accentColor);
+    color: white;
+    border: none;
+    border-radius: 999px;
+    padding: 6px 45px 6px 15px; /* Extra right padding for the divider + arrow */
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+    line-height: 1.2;
+}
+
+/* The Vertical Line Divider */
+.dropDownIcon::before {
+    content: "";
+    position: absolute;
+    left: -7px; /* Positions the line between number and arrow */
+    top: -30%;
+    height: 160%;
+    width: 3px;
+    background-color: var(--mainColor);
+}
+
+.dropDownIcon {
+    position: absolute;
+    right: 8px;
+    color: white;
+    font-size: 20px !important;
+    pointer-events: none; /* Allows the tap to "click through" to the select menu */
+}
+
+.btn, .bluetoothIcon, .mainActionButton, .nav-item {
+    display: flex;            /* Enables Flexbox */
+    align-items: center;      /* Vertical centering */
+    justify-content: center;   /* Horizontal centering */
+    padding: 0;               /* Remove default browser padding */
+    overflow: hidden;         /* Ensures nothing leaks out */
+}
+
+
+/* --- SPECIFIC COMPONENTS --- */
+
+#webcam-video {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    color: var(--bgColor);
+}
+
+/* Dividers */
+.bigDivider {
+    height: 2px;
+    width: 100%;
+    background: #eee;
+    margin: 10px 0;
+}
+
+.smallDivider {
+    height: 1px;
+    width: 80%;
+    background: #eee;
+    margin: 5px auto;
+}
+
+/* --- ICON SYSTEM --- */
+.material-symbols-rounded {
+    font-family: 'Material Symbols Rounded';
+    font-weight: normal;
+    font-style: normal;
+    font-size: 28px;
+    display: inline-block;
+    line-height: 1;           /* Removes extra vertical space */
+    width: 1em;               /* Force square bounding box */
+    height: 1em;              /* Force square bounding box */
+    text-align: center;
+    text-transform: none;
+    letter-spacing: normal;
+    word-wrap: normal;
+    white-space: nowrap;
+    direction: ltr;
+    font-variation-settings: 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+.bluetoothIcon {
+    color: var(--mainColor);
+    height: 32px;
+    width: 32px;
+}
+
+.bluetoothIcon .material-symbols-rounded {
+    font-size: 18px;
+    color: var(--mainColor);
+    position: relative;
+    right: -0.5px;
+}
+
+.profileIcon .material-symbols-rounded,
+.climbsIcon .material-symbols-rounded {
+    color: var(--bgColor);
+    font-size: 32px;
+    /* Icons are black on the cream bar */
+}
+
+.mainActionButton .material-symbols-rounded {
+    font-size: 48px;
+    color: var(--mainColor);
+}
