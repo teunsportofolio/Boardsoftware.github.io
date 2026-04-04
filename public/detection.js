@@ -37,7 +37,7 @@ if (draftClimb.name && climbNameDiv) {
 
 const camWidth = 1280;
 const camHeight = 720;
-const HOLD_DURATION = 1000;
+const HOLD_DURATION = 300;
 
 let CONFIDENCE_THRESHOLD = 0.5;
 let autoMode = false;
@@ -1278,13 +1278,15 @@ async function fetchNextSuggestion(move, anchorForNextMove, limb) {
             statusText.style.color = "var(--bgColor)";
 
             // 5. READABLE LOGS (Using Optional Chaining ?. for extra safety)
-            const physVal = data.analysis?.physical || 0;
-            const behVal = data.analysis?.behavioral || 0;
+const physVal = parseFloat(data.analysis?.lastMoveDiff || 0); 
+const behVal = parseFloat(data.analysis?.behaviorScore || 0);
+const totalStress = physVal + behVal;
 
-            const physLabel = physVal > 7 ? "🛑 HEAVY REACH" : physVal > 4 ? "🟡 STANDARD" : "🟢 EASY";
-            const chaosLabel = behVal > 7 ? "⚠️ FALTERING" : behVal > 4 ? "🤏 ADJUSTING" : "✅ STABLE";
+const physLabel = physVal > 7 ? "🛑 HEAVY REACH" : physVal > 4 ? "🟡 STANDARD" : "🟢 EASY";
+const chaosLabel = behVal > 7 ? "⚠️ FALTERING" : behVal > 4 ? "🤏 ADJUSTING" : "✅ STABLE";
 
-            console.groupCollapsed(`Coach Analysis: ${limb} (Stress: ${data.stress || 0})`);
+console.groupCollapsed(`Coach Analysis: ${limb} (Stress: ${totalStress.toFixed(2)})`);
+           
             
             console.log(`%c 🧠 COACH DECISION [${limb.toUpperCase()}] `, 'background: #222; color: #00FFFF; font-weight: bold;');
             console.log(`%c [PHYSICAL: ${physLabel}] %c [TECHNIQUE: ${chaosLabel}] `, 
