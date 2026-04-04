@@ -88,7 +88,7 @@ function moveDifficulty(oldHold, newHold) {
 
     // 2. Physics & Weight calculation
     const dist = distance(oldHold, newHold);
-    const holdScore = holdWeights[level] || 0;
+    const holdScore = holdWeights[level - 1] || 0;
     const dirScore = directionWeights[direction] || 0;
     const oldDir = holdDirections[oldHold.row]?.[oldHold.col];
 
